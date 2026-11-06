@@ -4,10 +4,12 @@
 // tool()  "pan" 둘러보기 · "draw" 그리기 · "look" 살펴보기
 // wheel   "zoom" 휠로 바로 키우고 줄인다 · "ctrl" Ctrl(⌘)을 누른 채일 때만(첫 화면처럼 쓸어 내려가는 쪽)
 // touch   "full" 한 손가락으로 끌어 둘러보거나 그린다 · "tap" 톡 누르기만 받는다(세로로 쓸면 쪽이 내려간다)
+// wheel·touch 는 함수로 줘도 된다(전체 화면일 때만 바꾸는 식으로)
 
 import { lineCells } from "./pen.js";
 
 const MOVE = { mouse: 4, pen: 6, touch: 9 }; // 이만큼(css px) 넘게 움직이면 누르기가 아니라 끌기
+const read = (v) => (typeof v === "function" ? v() : v);
 
 export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", touch = "full", onTap, onStroke, onView, onHover, onHint }) {
   const pts = new Map(); // pointerId → { x, y }
@@ -71,7 +73,7 @@ export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", t
     if (pts.size > 2) return;
 
     first = { id: e.pointerId, x: e.clientX, y: e.clientY, type: e.pointerType, cell: board.cellAt(e.clientX, e.clientY) };
-    if (e.pointerType === "touch" && touch === "tap") {
+    if (e.pointerType === "touch" && read(touch) === "tap") {
       mode = "tap"; // 붙잡지 않는다: 세로로 쓸면 쪽이 내려가야 한다
       return;
     }
@@ -159,7 +161,7 @@ export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", t
   canvas.addEventListener(
     "wheel",
     (e) => {
-      if (wheel === "ctrl" && !e.ctrlKey && !e.metaKey) {
+      if (read(wheel) === "ctrl" && !e.ctrlKey && !e.metaKey) {
         if (onHint) onHint("wheel");
         return; // 쪽이 그대로 내려간다
       }

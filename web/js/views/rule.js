@@ -13,7 +13,7 @@ import { makeLoop, makePainter } from "../ui/loop.js";
 import { attachNav } from "../ui/nav.js";
 import { boardColors } from "../ui/theme.js";
 import { makeRulePad, makeNotationField, describeRule, blockedReason } from "../ui/rulepad.js";
-import { segmented, paragraphs, zoomControls, flashLine, makeCapsule } from "../ui/widgets.js";
+import { segmented, paragraphs, zoomControls, flashLine, makeCapsule, makeFullscreen } from "../ui/widgets.js";
 import { makeSpark } from "../ui/spark.js";
 import { patternArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
@@ -112,8 +112,12 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   const peek = h("div", { class: "peek", hidden: true, "aria-live": "polite" });
   const hint = h("p", { class: "stage-hint", hidden: true });
   const flash = flashLine();
-  const zoom = zoomControls({ onIn: () => zoomBy(1.25), onOut: () => zoomBy(0.8), onFit: () => fitView() });
-  const stage = h("div", { class: "stage", dataset: { tool } }, canvas, peek, hint, flash.el, zoom.el);
+  const zoom = zoomControls({ onIn: () => zoomBy(1.25), onOut: () => zoomBy(0.8), onFit: () => fitView(), onFull: () => fs.toggle() });
+  // 전체 화면에서만 보이는 세대·산 칸
+  const statGen = h("b", {}, "0");
+  const statPop = h("b", {}, "0");
+  const stats = h("p", { class: "stage-stats" }, h("span", {}, t("세대")), statGen, h("span", {}, t("산 칸")), statPop);
+  const stage = h("div", { class: "stage", dataset: { tool } }, canvas, peek, hint, stats, flash.el, zoom.el);
   const board = makeBoard(canvas, { onResize: () => ready() });
 
   const capsule = makeCapsule({
@@ -280,6 +284,24 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
           : null,
       ];
 
+  // 격자와 재생 막대, 손·빠르기를 한 묶음으로. 전체 화면에서는 이 묶음이 화면을 채우고 아래 띠가 된다
+  const boardWrap = h(
+    "div",
+    { class: "board-wrap" },
+    stage,
+    capsule.el,
+    h("div", { class: "transport" }, toolSeg.el, h("span", { class: "gap" }), speedSeg.el),
+  );
+  const fs = makeFullscreen(boardWrap, {
+    onChange(on) {
+      zoom.setFull(on);
+      flash.hide();
+      paint();
+      // 들어가면 재생 단추로 옮겨 스페이스가 재생·일시정지가 되게
+      if (on) playBtn.focus({ preventScroll: true });
+    },
+  });
+
   main.append(
     h(
       "div",
@@ -289,13 +311,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       h(
         "div",
         { class: "bench" },
-        h(
-          "div",
-          {},
-          h("div", { class: "board-wrap" }, stage, capsule.el),
-          h("div", { class: "transport" }, toolSeg.el, h("span", { class: "gap" }), speedSeg.el),
-          status,
-        ),
+        h("div", {}, boardWrap, status),
         side,
       ),
       notes,
@@ -312,8 +328,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   function render(p = 1) {
     const lc = lookAt();
     board.draw(world, { t: p, hover: tool !== "look" ? hover : null, look: lc ? { x: lc[0], y: lc[1], neighbors: around(lc[0], lc[1]) } : null });
-    genNum.textContent = num(world.gen);
-    popNum.textContent = num(world.count);
+    genNum.textContent = statGen.textContent = num(world.gen);
+    popNum.textContent = statPop.textContent = num(world.count);
     chgNum.textContent = num(world.lastChanged);
     const now = performance.now();
     if (!loop.running || now - sparkAt > 250) {
@@ -697,14 +713,17 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       if (k === "+" || k === "=") return zoomBy(1.25), true;
       if (k === "-" || k === "_") return zoomBy(0.8), true;
       if (k === "0") return fitView(), true;
+      if (k === "f" || k === "F") return fs.toggle(), true;
       if (k === "Escape" && look) {
         look = null;
         paint();
         return true;
       }
+      if (k === "Escape" && fs.on) return fs.exit(), true;
       return false;
     },
     destroy() {
+      fs.destroy();
       loop.cancel();
       paint.cancel();
       board.disconnect();

@@ -34,19 +34,85 @@ export function makeCapsule({ onPlay, onStep, onBack, onScatter, onClear }) {
   };
 }
 
-/** 격자 오른쪽 위의 축소·확대·모두 보기 단추 */
-export function zoomControls({ onIn, onOut, onFit }) {
+/** 격자 오른쪽 위의 축소·확대·모두 보기 단추(와 onFull 이 있으면 전체 화면 단추) */
+export function zoomControls({ onIn, onOut, onFit, onFull = null }) {
   const btn = (ic, label, key, fn) =>
     h("button", { type: "button", class: "zoom-btn", title: `${label} (${key})`, "aria-label": label, "aria-keyshortcuts": key, onclick: fn }, icon(ic));
   const out = btn(ICON.minus, t("축소"), "-", onOut);
   const inn = btn(ICON.plus, t("확대"), "+", onIn);
-  const fit = btn(ICON.fit, t("산 칸이 모두 보이게"), "0", onFit);
+  const fit = btn(ICON.locate, t("산 칸이 모두 보이게"), "0", onFit);
+  const full = onFull ? btn(ICON.full, t("전체 화면"), "F", onFull) : null;
+  if (full) full.setAttribute("aria-pressed", "false");
   return {
-    el: h("div", { class: "zoom", role: "group", "aria-label": t("확대·축소") }, out, inn, fit),
+    el: h("div", { class: "zoom", role: "group", "aria-label": t("보기") }, out, inn, fit, full),
     /** can: board.canZoom() */
     update(can) {
       inn.disabled = !can.in;
       out.disabled = !can.out;
+    },
+    /** 전체 화면 단추를 들어가기 ↔ 끝내기로 바꾼다 */
+    setFull(on) {
+      if (!full) return;
+      const label = on ? t("전체 화면 끝내기") : t("전체 화면");
+      clear(full).append(icon(on ? ICON.unfull : ICON.full));
+      full.title = `${label} (F)`;
+      full.setAttribute("aria-label", label);
+      full.setAttribute("aria-pressed", String(on));
+    },
+  };
+}
+
+/**
+ * 격자 묶음(target)이 화면을 가득 채우게 한다. 브라우저 전체 화면을 쓰고,
+ * 그게 안 되는 곳(아이폰, 막힌 틀 안)에서는 쪽 위를 덮기만 한다. onChange(on) 은 Esc 로 나올 때도 부른다.
+ */
+export function makeFullscreen(target, { onChange }) {
+  let on = false;
+  const native = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+  function set(v) {
+    if (v === on) return;
+    on = v;
+    target.classList.toggle("is-full", on);
+    document.documentElement.classList.toggle("has-full", on);
+    if (onChange) onChange(on);
+  }
+  async function enter() {
+    set(true);
+    try {
+      if (target.requestFullscreen) await target.requestFullscreen({ navigationUI: "hide" });
+      else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+    } catch {
+      /* 브라우저 전체 화면이 막히면 쪽 위를 덮는 것으로 끝낸다 */
+    }
+  }
+  function exit() {
+    if (native() === target) {
+      const out = document.exitFullscreen || document.webkitExitFullscreen;
+      try {
+        const p = out && out.call(document);
+        if (p && p.catch) p.catch(() => {});
+      } catch {
+        /* 이미 나왔다 */
+      }
+    }
+    set(false);
+  }
+  // 브라우저 전체 화면에서 Esc 로 나오면 따라 나온다
+  const onNative = () => {
+    if (on && native() !== target && !native()) set(false);
+  };
+  document.addEventListener("fullscreenchange", onNative);
+  document.addEventListener("webkitfullscreenchange", onNative);
+  return {
+    toggle: () => (on ? exit() : enter()),
+    exit,
+    get on() {
+      return on;
+    },
+    destroy() {
+      if (on) exit();
+      document.removeEventListener("fullscreenchange", onNative);
+      document.removeEventListener("webkitfullscreenchange", onNative);
     },
   };
 }
@@ -96,7 +162,8 @@ export function segmented({ label, options, value, onChange, cls = "seg", item =
         },
       },
       o.icon || null,
-      o.name || null,
+      // 그림과 이름이 함께면 이름을 감싸 둔다(좁은 곳에서는 그림만 보이고 이름은 읽어 주기로)
+      o.name ? (o.icon ? h("span", { class: "seg-label" }, o.name) : o.name) : null,
     ),
   );
   function set(id) {

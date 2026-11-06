@@ -11,7 +11,7 @@ import { makeLoop, makePainter } from "../ui/loop.js";
 import { attachNav } from "../ui/nav.js";
 import { boardColors } from "../ui/theme.js";
 import { makeRulePad, describeRule } from "../ui/rulepad.js";
-import { segmented, zoomControls, flashLine, modKey, makeCapsule } from "../ui/widgets.js";
+import { segmented, zoomControls, flashLine, modKey, makeCapsule, makeFullscreen } from "../ui/widgets.js";
 import { newRuleArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { shortName, creditOf, tagOf, SOON } from "../data/catalog.js";
@@ -57,8 +57,12 @@ function makeHero(presets) {
   const board = makeBoard(canvas, { onResize: () => ready() });
   const hint = h("p", { class: "stage-hint", hidden: true }, t("칸을 눌러 살릴 칸을 고른 다음, 재생을 눌러 보세요."));
   const flash = flashLine();
-  const zoom = zoomControls({ onIn: () => zoomBy(1.25), onOut: () => zoomBy(0.8), onFit: () => fitView() });
-  const stage = h("div", { class: "stage" }, canvas, hint, flash.el, zoom.el);
+  const zoom = zoomControls({ onIn: () => zoomBy(1.25), onOut: () => zoomBy(0.8), onFit: () => fitView(), onFull: () => fs.toggle() });
+  // 전체 화면에서만 보이는 세대·산 칸
+  const statGen = h("b", {}, "0");
+  const statPop = h("b", {}, "0");
+  const stats = h("p", { class: "stage-stats" }, h("span", {}, t("세대")), statGen, h("span", {}, t("산 칸")), statPop);
+  const stage = h("div", { class: "stage" }, canvas, hint, stats, flash.el, zoom.el);
 
   const capsule = makeCapsule({
     onPlay: () => setPlaying(!wantPlay),
@@ -86,8 +90,8 @@ function makeHero(presets) {
 
   function render(p = 1) {
     board.draw(world, { t: p, hover });
-    genNum.textContent = num(world.gen);
-    popNum.textContent = num(world.count);
+    genNum.textContent = statGen.textContent = num(world.gen);
+    popNum.textContent = statPop.textContent = num(world.count);
     hint.hidden = world.count > 0;
   }
 
@@ -227,10 +231,11 @@ function makeHero(presets) {
     paint();
   }
 
+  // 쪽 안에서는 휠·손가락이 쪽을 내려야 하니 Ctrl+휠과 톡 누르기만 받고, 전체 화면에서는 바로 확대하고 한 손가락으로 끈다
   attachNav(canvas, board, {
     tool: () => "pan",
-    wheel: "ctrl",
-    touch: "tap",
+    wheel: () => (fs.on ? "zoom" : "ctrl"),
+    touch: () => (fs.on ? "full" : "tap"),
     onTap([x, y]) {
       auto = false;
       world.set(x, y, world.get(x, y) === 1 ? 0 : 1);
@@ -259,6 +264,20 @@ function makeHero(presets) {
       : null;
   io?.observe(stage);
 
+  // 전체 화면: 격자가 화면을 채우고 재생 막대는 아래 띠가 된다
+  const heroBoard = h("div", { class: "hero-board" }, stage, capsule.el);
+  const fs = makeFullscreen(heroBoard, {
+    onChange(on) {
+      zoom.setFull(on);
+      flash.hide();
+      if (on) visible = true;
+      update();
+      paint();
+      // 들어가면 재생 단추로 옮겨 스페이스가 재생·일시정지가 되게(전체 화면 단추가 다시 눌리지 않게)
+      if (on) capsule.playBtn.focus({ preventScroll: true });
+    },
+  });
+
   const el = h(
     "section",
     { class: "hero", "aria-labelledby": "hero-t" },
@@ -269,7 +288,7 @@ function makeHero(presets) {
       t("칸마다 이웃 여덟 칸만 보고 다음 세대에 살지 죽을지 정해요. 이런 세계를 세포 자동자라고 해요. 격자는 끝없이 이어져서, 끌면 어디로든 둘러볼 수 있어요."),
     ),
     h("div", { class: "hero-rules" }, chips.el),
-    h("div", { class: "hero-board" }, stage, capsule.el),
+    heroBoard,
     h(
       "div",
       { class: "console" },
@@ -303,9 +322,12 @@ function makeHero(presets) {
       if (k === "+" || k === "=") return zoomBy(1.25), true;
       if (k === "-" || k === "_") return zoomBy(0.8), true;
       if (k === "0") return fitView(), true;
+      if (k === "f" || k === "F") return fs.toggle(), true;
+      if (k === "Escape" && fs.on) return fs.exit(), true;
       return false;
     },
     destroy() {
+      fs.destroy();
       loop.cancel();
       paint.cancel();
       io?.disconnect();
