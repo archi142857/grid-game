@@ -1,0 +1,13 @@
+# 배포할 때 scripts/stamp.py 가 만드는 폴더
+_site/
+
+# 편집기와 OS
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# 파이썬, 노드
+__pycache__/
+node_modules/

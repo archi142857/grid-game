@@ -1,0 +1,11 @@
+{
+  "id": "star-wars",
+  "name": "스타워즈",
+  "description": "산 칸은 이웃이 3~5개면 버티고, 버티지 못한 칸은 두 단계에 걸쳐 사라져요. 날아다니는 무늬가 우주 전쟁처럼 부딪혀요.",
+  "family": "life",
+  "grid": { "edges": "wrap" },
+  "neighborhood": "moore",
+  "states": [{ "name": "빈칸" }, { "name": "산 칸" }, { "name": "사라지는 칸 1" }, { "name": "사라지는 칸 2" }],
+  "rule": { "birth": [2], "survive": [3, 4, 5] },
+  "seed": { "type": "random", "density": 0.4 }
+}

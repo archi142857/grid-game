@@ -1,0 +1,11 @@
+{
+  "id": "highlife",
+  "name": "하이라이프",
+  "description": "생명 게임에 '이웃이 6개여도 태어남'을 하나 더한 규칙이에요. 스스로를 복제하는 작은 무늬가 살아요.",
+  "family": "life",
+  "grid": { "edges": "wrap" },
+  "neighborhood": "moore",
+  "states": [{ "name": "빈칸" }, { "name": "산 칸" }],
+  "rule": { "birth": [3, 6], "survive": [2, 3] },
+  "seed": { "type": "random", "density": 0.3 }
+}

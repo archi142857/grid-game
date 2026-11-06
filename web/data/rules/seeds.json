@@ -1,0 +1,11 @@
+{
+  "id": "seeds",
+  "name": "씨앗",
+  "description": "산 칸은 한 세대만 살고 사라져요. 그런데도 몇 칸만 있으면 폭발하듯 퍼져 판을 덮어요.",
+  "family": "life",
+  "grid": { "edges": "wrap" },
+  "neighborhood": "moore",
+  "states": [{ "name": "빈칸" }, { "name": "산 칸" }],
+  "rule": { "birth": [2], "survive": [] },
+  "seed": { "type": "random", "density": 0.4, "area": 0.1 }
+}

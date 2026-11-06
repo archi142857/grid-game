@@ -1,0 +1,11 @@
+{
+  "id": "maze",
+  "name": "미로",
+  "description": "잘 죽지 않는 칸들이 자라며 벽과 복도가 또렷한 미로를 그려요.",
+  "family": "life",
+  "grid": { "edges": "wrap" },
+  "neighborhood": "moore",
+  "states": [{ "name": "빈칸" }, { "name": "산 칸" }],
+  "rule": { "birth": [3], "survive": [1, 2, 3, 4, 5] },
+  "seed": { "type": "random", "density": 0.4, "area": 0.2 }
+}

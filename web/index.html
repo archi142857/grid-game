@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grid Game — 격자 게임</title>
+<meta name="description" content="세포 자동자를 브라우저에서 바로 돌려 보고, 태어남·살아남음 숫자를 바꿔 나만의 규칙을 만들어요.">
+<meta name="theme-color" content="#f3f3f0">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="Grid Game — 격자 게임">
+<meta property="og:description" content="세포 자동자를 돌려 보고 규칙을 직접 만들어요.">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<script>
+  // 그리기 전에 밝은·어두운 화면을 정한다(번쩍임을 막는다). js/ui/theme.js 의 applyScheme 과 같은 판단
+  (function () {
+    var s = "system", d = false;
+    try { s = JSON.parse(localStorage.getItem("grid.scheme")) || "system"; } catch (e) {}
+    try { d = s === "dark" || (s !== "light" && matchMedia("(prefers-color-scheme: dark)").matches); } catch (e) {}
+    document.documentElement.dataset.scheme = d ? "dark" : "light";
+    document.querySelector('meta[name="theme-color"]').content = d ? "#111214" : "#f3f3f0";
+  })();
+</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/doto@5.3.0/full.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main" id="skip">본문으로 건너뛰기</a>
+<header class="top" id="top">
+  <div class="top-in">
+    <a class="brand" href="#/" aria-label="Grid Game 첫 화면">
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        <g fill="currentColor" opacity="0.16"><circle cx="5" cy="5" r="2"/><circle cx="25" cy="5" r="2"/><circle cx="5" cy="15" r="2"/><circle cx="15" cy="15" r="2"/></g>
+        <g fill="currentColor"><circle cx="15" cy="5" r="4.2"/><circle cx="25" cy="15" r="4.2"/><circle cx="5" cy="25" r="4.2"/><circle cx="15" cy="25" r="4.2"/></g>
+        <circle cx="25" cy="25" r="4.2" fill="#dc2f6c"/>
+      </svg>
+      <span class="brand-word">GRID GAME</span>
+    </a>
+    <nav class="nav" aria-label="주 메뉴">
+      <a href="#/" data-nav="home">도감</a>
+      <a href="#/make" data-nav="make">만들기</a>
+      <a href="#/about" data-nav="about">소개</a>
+    </nav>
+    <button class="icon-btn" type="button" id="theme-btn" aria-label="화면 밝기 바꾸기"></button>
+  </div>
+</header>
+<main id="main" tabindex="-1"><div class="wrap"><p class="loading">불러오는 중이에요…</p></div></main>
+<footer class="foot">
+  <div class="wrap">
+    <span>Grid Game. 설정은 이 브라우저에만 남아요.</span>
+    <a href="#/about">만든 사람과 출처</a>
+    <a href="https://github.com/Archi142857/grid-game" rel="noopener">GitHub</a>
+  </div>
+</footer>
+<noscript><p style="padding:24px">자바스크립트를 켜야 쓸 수 있어요. / Please turn on JavaScript.</p></noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

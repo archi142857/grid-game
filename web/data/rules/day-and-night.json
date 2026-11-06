@@ -1,0 +1,11 @@
+{
+  "id": "day-and-night",
+  "name": "낮과 밤",
+  "description": "산 칸과 빈칸을 뒤바꿔도 똑같이 움직이는 규칙이에요. 낮과 밤처럼 두 땅이 맞서며 자라요.",
+  "family": "life",
+  "grid": { "edges": "wrap" },
+  "neighborhood": "moore",
+  "states": [{ "name": "빈칸" }, { "name": "산 칸" }],
+  "rule": { "birth": [3, 6, 7, 8], "survive": [3, 4, 6, 7, 8] },
+  "seed": { "type": "random", "density": 0.5 }
+}
