@@ -1,11 +1,13 @@
 // 규칙 파일(JSON)을 검사하고 앱이 쓰는 꼴로 고른다. 1단계에서는 Life 계열만 돌린다.
-// 형식은 기획서 5절을 따른다. 상태 색(color)을 빼면 화면 색을 쓰고, 격자 크기(width·height)를 빼면 고른 크기를 쓴다.
+// 형식은 기획서 5절을 따른다. 상태 색(color)을 빼면 화면 색을 쓴다.
+// 격자(grid.edges): infinite 는 끝없는 격자, wrap·wall 은 크기(width·height)가 있는 격자. Life 계열은 끝없는 격자에서 돌린다.
 
 import { t } from "../i18n.js";
 import { MIN_STATES, MAX_STATES } from "./life.js";
 
 export const READY_FAMILIES = ["life"];
 export const SEED_TYPES = ["empty", "random", "single", "rle"];
+export const EDGES = ["infinite", "wrap", "wall"];
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const uniqSorted = (xs) => [...new Set(xs)].sort((a, b) => a - b);
@@ -31,16 +33,22 @@ export function checkRuleFile(obj) {
 
   const rule = obj.rule ?? {};
   if (!isCountList(rule.birth)) errors.push(t("rule.birth: 0–8 사이 정수의 배열이어야 해요"));
+  else if (obj.family === "life" && rule.birth.includes(0)) errors.push(t("rule.birth: 끝없는 격자에서는 0을 쓸 수 없어요"));
   if (!isCountList(rule.survive)) errors.push(t("rule.survive: 0–8 사이 정수의 배열이어야 해요"));
 
   const neighborhood = obj.neighborhood ?? "moore";
   if (neighborhood !== "moore") errors.push(t("neighborhood: 지금은 moore 만 돼요"));
 
   const grid = obj.grid ?? {};
-  const edges = grid.edges ?? "wrap";
-  if (edges !== "wrap" && edges !== "wall") errors.push(t("grid.edges: wrap 이나 wall 이어야 해요"));
-  if (grid.width !== undefined && !isSize(grid.width)) errors.push(t("grid.width: 3–2000 사이 정수여야 해요"));
-  if (grid.height !== undefined && !isSize(grid.height)) errors.push(t("grid.height: 3–2000 사이 정수여야 해요"));
+  const edges = grid.edges ?? "infinite";
+  if (!EDGES.includes(edges)) errors.push(t("grid.edges: infinite·wrap·wall 가운데 하나여야 해요"));
+  else if (obj.family === "life" && edges !== "infinite") errors.push(t("grid.edges: Life 계열은 끝없는 격자(infinite)에서 돌아가요"));
+  if (edges === "infinite") {
+    if (grid.width !== undefined || grid.height !== undefined) errors.push(t("grid.width·height: 끝없는 격자에는 크기를 적지 않아요"));
+  } else {
+    if (grid.width !== undefined && !isSize(grid.width)) errors.push(t("grid.width: 3–2000 사이 정수여야 해요"));
+    if (grid.height !== undefined && !isSize(grid.height)) errors.push(t("grid.height: 3–2000 사이 정수여야 해요"));
+  }
 
   const seed = obj.seed ?? { type: "empty" };
   if (!seed || !SEED_TYPES.includes(seed.type)) errors.push(t("seed.type: empty·random·single·rle 가운데 하나여야 해요"));
@@ -57,7 +65,7 @@ export function checkRuleFile(obj) {
       name: typeof obj.name === "string" && obj.name ? obj.name : t("이름 없는 규칙"),
       description: typeof obj.description === "string" ? obj.description : "",
       family: obj.family,
-      grid: { edges, width: grid.width, height: grid.height },
+      grid: edges === "infinite" ? { edges } : { edges, width: grid.width, height: grid.height },
       neighborhood,
       states: states.map((s) => (s.color ? { name: s.name, color: s.color } : { name: s.name })),
       birth: uniqSorted(rule.birth),
@@ -102,8 +110,7 @@ export function resizeStates(states, n) {
 export const lifeRule = (r) => ({ birth: r.birth, survive: r.survive, states: r.states.length });
 
 /** 움직임이 같은 규칙인가(이름·색·시작 상태는 보지 않는다) */
-export const sameRule = (a, b) =>
-  a.birth.join() === b.birth.join() && a.survive.join() === b.survive.join() && a.states.length === b.states.length && a.grid.edges === b.grid.edges;
+export const sameRule = (a, b) => a.birth.join() === b.birth.join() && a.survive.join() === b.survive.join() && a.states.length === b.states.length;
 
 /** 규칙 파일 글. 맨 위 항목마다 한 줄, 그 안은 한 줄로 적는다(프리셋 파일과 같은 꼴) */
 export function formatRuleFile(obj) {

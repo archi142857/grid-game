@@ -1,19 +1,19 @@
-// 규칙 화면: 격자를 크게 돌리며 규칙을 고친다. 도감 규칙(#/r/<id>)과 만들기(#/make)가 함께 쓴다.
+// 규칙 화면: 끝없는 격자를 크게 돌리며 규칙을 고친다. 도감 규칙(#/r/<id>)과 만들기(#/make)가 함께 쓴다.
 // 왼쪽은 격자와 재생, 오른쪽은 규칙·기록·더 보기. 고급 설정은 '더 보기' 안에만 둔다.
 
-import { h, icon, ICON, setTitle, reducedMotion, clear } from "../ui/dom.js";
+import { h, icon, ICON, setTitle, reducedMotion } from "../ui/dom.js";
 import { t, num } from "../i18n.js";
-import { formatNotation, parseNotation, neighborCells, liveNeighbors, explain, MAX_STATES } from "../core/life.js";
+import { formatNotation, parseNotation, explain, MAX_STATES } from "../core/life.js";
 import { checkRuleFile, toRuleFile, formatRuleFile, resizeStates, lifeRule, sameRule } from "../core/rules.js";
 import { parseRLE } from "../core/rle.js";
 import { randomSeed } from "../core/rng.js";
-import { makeWorld } from "../ui/world.js";
+import { makeWorld, regionAt } from "../ui/world.js";
 import { makeBoard } from "../ui/board.js";
 import { makeLoop, makePainter } from "../ui/loop.js";
-import { attachPen } from "../ui/pen.js";
+import { attachNav } from "../ui/nav.js";
 import { boardColors } from "../ui/theme.js";
-import { makeRulePad, makeNotationField, describeRule } from "../ui/rulepad.js";
-import { segmented, paragraphs } from "../ui/widgets.js";
+import { makeRulePad, makeNotationField, describeRule, blockedReason } from "../ui/rulepad.js";
+import { segmented, paragraphs, zoomControls, flashLine, makeCapsule } from "../ui/widgets.js";
 import { makeSpark } from "../ui/spark.js";
 import { patternArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
@@ -22,12 +22,12 @@ import { entryOf, tagOf, MORE_RULES, MAKE_TIPS } from "../data/catalog.js";
 import { crumb } from "./common.js";
 
 const copy = (o) => structuredClone(o);
-const SIZES = [48, 64, 96, 128];
 const SPEEDS = [
   { id: "slow", n: 4, name: () => t("느리게") },
   { id: "normal", n: 10, name: () => t("보통") },
   { id: "fast", n: 30, name: () => t("빠르게") },
 ];
+const ZOOM = 10; // 처음 칸 한 변(css px)
 
 const WHY = {
   born: (n) => t("태어남에 {n:이가} 있어요", { n }),
@@ -39,6 +39,24 @@ const WHY = {
   gone: () => t("마지막 단계라 빈칸이 돼요"),
 };
 const ROW_OF = { born: "birth", stay: "birth", survive: "survive", die: "survive", fade: "survive" };
+
+const TOOL_TIP = {
+  pan: () => t("끌어서 둘러보고, 칸을 눌러 살리거나 비워요. 휠이나 두 손가락으로 확대·축소해요."),
+  draw: () => t("끌어서 칸을 그려요. 산 칸에서 시작하면 지워요. 둘러보려면 오른쪽 단추나 두 손가락으로 끌어요."),
+  look: () => t("칸에 커서를 올리거나 눌러 보세요. 이웃을 세고 다음 세대를 알려 줘요."),
+};
+
+/** 8 이웃 자리 */
+const around = (x, y) => [
+  [x - 1, y - 1],
+  [x, y - 1],
+  [x + 1, y - 1],
+  [x - 1, y],
+  [x + 1, y],
+  [x - 1, y + 1],
+  [x, y + 1],
+  [x + 1, y + 1],
+];
 
 /** 규칙에 표기만 바꿔 씌운 것(그림용) */
 function withNotation(rule, code) {
@@ -57,7 +75,7 @@ function blankRule() {
     name: t("내 규칙"),
     description: "",
     family: "life",
-    grid: { edges: "wrap" },
+    grid: { edges: "infinite" },
     neighborhood: "moore",
     states: [{ name: t("빈칸") }, { name: t("산 칸") }],
     birth: [3],
@@ -71,52 +89,41 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   const base = make ? blankRule() : preset;
   const entry = make ? null : entryOf(preset.id);
   let rule = copy(base);
-  // 주소의 ?rule=B36/S23&edges=wall 로 시작할 수 있다(고친 규칙을 주소로 나눈다)
+  // 주소의 ?rule=B36/S23 으로 시작할 수 있다(고친 규칙을 주소로 나눈다)
   const fromUrl = params.rule ? parseNotation(params.rule) : null;
-  if (fromUrl) {
+  if (fromUrl && !fromUrl.birth.includes(0)) {
     rule.birth = fromUrl.birth;
     rule.survive = fromUrl.survive;
     rule.states = resizeStates(rule.states, fromUrl.states);
   }
-  if (params.edges === "wall" || params.edges === "wrap") rule.grid.edges = params.edges;
   setTitle(make ? t("새 규칙") : preset.name);
 
-  let size = SIZES.includes(load("size", 64)) ? load("size", 64) : 64;
   let speed = SPEEDS.find((x) => x.id === load("speed", "normal")) ?? SPEEDS[1];
-  let tool = "draw";
+  let tool = "pan";
   let look = null; // 눌러서 고정한 칸 [x, y]
   let hover = null; // 커서 아래 칸
-  const gw = () => rule.grid.width ?? size;
-  const gh = () => rule.grid.height ?? size;
+  let seeded = false;
 
-  const world = makeWorld(rule, { w: gw(), h: gh() });
-  world.reseed();
+  const world = makeWorld(rule);
   const thumbs = [];
 
   // ── 격자 ─────────────────
-  const canvas = h("canvas", { role: "img", "aria-label": t("격자. 그리기에서는 칸을 눌러 바꾸고, 살펴보기에서는 칸의 이웃과 다음 세대를 보여 줘요") });
+  const canvas = h("canvas", { role: "img", "aria-label": t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 살리거나 비워요") });
   const peek = h("div", { class: "peek", hidden: true, "aria-live": "polite" });
-  const stage = h("div", { class: "stage" }, canvas, peek);
-  const board = makeBoard(canvas, { onResize: () => paint() });
+  const hint = h("p", { class: "stage-hint", hidden: true });
+  const flash = flashLine();
+  const zoom = zoomControls({ onIn: () => zoomBy(1.25), onOut: () => zoomBy(0.8), onFit: () => fitView() });
+  const stage = h("div", { class: "stage", dataset: { tool } }, canvas, peek, hint, flash.el, zoom.el);
+  const board = makeBoard(canvas, { onResize: () => ready() });
 
-  const playBtn = h("button", { class: "btn ink", type: "button", "aria-keyshortcuts": "Space", onclick: () => setRunning(!loop.running) });
-  const stepBtn = h(
-    "button",
-    {
-      class: "btn square",
-      type: "button",
-      title: t("한 세대 (→)"),
-      "aria-label": t("한 세대 넘기기"),
-      "aria-keyshortcuts": "ArrowRight",
-      onclick: () => stepOne(),
-    },
-    icon(ICON.step),
-  );
-  const backBtn = h(
-    "button",
-    { class: "btn square", type: "button", title: t("처음으로 (R)"), "aria-label": t("처음 모습으로"), "aria-keyshortcuts": "R", onclick: () => goBack() },
-    icon(ICON.reset),
-  );
+  const capsule = makeCapsule({
+    onPlay: () => setRunning(!loop.running),
+    onStep: () => stepOne(),
+    onBack: () => goBack(),
+    onScatter: () => scatter(),
+    onClear: () => clearAll(),
+  });
+  const playBtn = capsule.playBtn;
   const speedSeg = segmented({
     label: t("빠르기"),
     value: speed.id,
@@ -130,8 +137,9 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     label: t("손"),
     value: tool,
     options: [
-      { id: "draw", icon: icon(ICON.pen), title: t("그리기") },
-      { id: "look", icon: icon(ICON.eye), title: t("살펴보기") },
+      { id: "pan", icon: icon(ICON.move), name: t("이동"), title: t("이동: 끌어서 둘러보기") },
+      { id: "draw", icon: icon(ICON.pen), name: t("그리기"), title: t("그리기: 끌어서 칸 그리기") },
+      { id: "look", icon: icon(ICON.eye), name: t("살펴보기"), title: t("살펴보기: 칸의 이웃과 다음 세대") },
     ],
     onChange: (id) => setTool(id),
   });
@@ -139,7 +147,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   // ── 오른쪽: 규칙 ─────────────────
   const restoreBtn = h("button", { class: "text-btn", type: "button", hidden: true, onclick: () => restore() }, t("원래대로"));
-  const pad = makeRulePad({ onToggle: (kind, n) => toggleCount(kind, n) });
+  const pad = makeRulePad({ onToggle: (kind, n) => toggleCount(kind, n), onLocked: (why) => (say.textContent = why) });
   const say = h("p", { class: "say" });
   const notation = makeNotationField({ onCommit: (text) => setNotation(text) });
 
@@ -150,21 +158,6 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   const spark = makeSpark();
 
   // ── 오른쪽: 더 보기 ─────────────────
-  const sizeSeg = segmented({
-    label: t("격자 크기"),
-    value: String(size),
-    options: SIZES.map((n) => ({ id: String(n), name: String(n), title: `${n}×${n}` })),
-    onChange: (v) => setSize(Number(v)),
-  });
-  const edgeSeg = segmented({
-    label: t("가장자리"),
-    value: rule.grid.edges,
-    options: [
-      { id: "wrap", name: t("이어짐"), title: t("맞은편 가장자리와 이어 붙여요") },
-      { id: "wall", name: t("벽"), title: t("격자 밖은 늘 빈칸이에요") },
-    ],
-    onChange: (id) => setEdges(id),
-  });
   const statesOut = h("output", {}, "2");
   const statesField = h(
     "div",
@@ -219,8 +212,6 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       h(
         "div",
         { class: "more-body" },
-        field(t("격자 크기"), sizeSeg.el),
-        field(t("가장자리"), edgeSeg.el),
         field(t("상태 수"), statesField, h("span", { class: "field-label" }, t("3 이상이면 죽는 칸이 그만큼 단계를 거쳐 사라져요."))),
         field(
           t("규칙 파일"),
@@ -301,16 +292,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
         h(
           "div",
           {},
-          stage,
-          h("div", { class: "transport" }, playBtn, stepBtn, backBtn, h("span", { class: "gap" }), speedSeg.el),
-          h(
-            "div",
-            { class: "transport" },
-            toolSeg.el,
-            h("span", { class: "gap" }),
-            h("button", { class: "btn small", type: "button", onclick: () => scatter() }, icon(ICON.shuffle), t("흩뿌리기")),
-            h("button", { class: "btn small", type: "button", onclick: () => clearAll() }, t("비우기")),
-          ),
+          h("div", { class: "board-wrap" }, stage, capsule.el),
+          h("div", { class: "transport" }, toolSeg.el, h("span", { class: "gap" }), speedSeg.el),
           status,
         ),
         side,
@@ -320,17 +303,15 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   );
 
   // ── 돌리기와 그리기 ─────────────────
-  const loop = makeLoop({ step: () => world.step(), draw: (p) => render(p), rate: () => speed.n });
+  const loop = makeLoop({ step: () => tick(), draw: (p) => render(p), rate: () => speed.n });
   const paint = makePainter(() => render(loop.progress()));
   let sparkAt = 0;
 
   const lookAt = () => look || (tool === "look" ? hover : null);
 
   function render(p = 1) {
-    const { w, h: hh } = world.grid;
     const lc = lookAt();
-    const lk = lc ? { x: lc[0], y: lc[1], neighbors: neighborCells(w, hh, lc[0], lc[1], world.wrap()) } : null;
-    board.draw(world.cells, world.prev, { t: p, hover: tool === "draw" ? hover : null, look: lk });
+    board.draw(world, { t: p, hover: tool !== "look" ? hover : null, look: lc ? { x: lc[0], y: lc[1], neighbors: around(lc[0], lc[1]) } : null });
     genNum.textContent = num(world.gen);
     popNum.textContent = num(world.count);
     chgNum.textContent = num(world.lastChanged);
@@ -339,6 +320,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       sparkAt = now;
       spark.update(world.alive, world.start);
     }
+    hint.hidden = world.count > 0;
+    if (!hint.hidden) hint.textContent = tool === "draw" ? t("끌어서 칸을 그린 다음, 재생을 눌러 보세요.") : t("칸을 눌러 살릴 칸을 고른 다음, 재생을 눌러 보세요.");
     showPeek(lc);
   }
 
@@ -349,9 +332,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       return;
     }
     const [x, y] = lc;
-    const { w, h: hh } = world.grid;
-    const s = world.cells[y * w + x];
-    const n = liveNeighbors(world.cells, w, hh, x, y, world.wrap());
+    const s = world.get(x, y);
+    const n = around(x, y).filter(([a, b]) => world.get(a, b) === 1).length;
     const ex = explain(lifeRule(rule), s, n);
     const name = (i) => rule.states[i]?.name ?? String(i);
     peek.replaceChildren(
@@ -376,45 +358,95 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     peek.style.top = `${Math.max(8, top)}px`;
   }
 
+  /** 보이는 넓이에 k 를 곱한 네모 */
+  const viewRegion = (k = 1) => {
+    const v = board.view();
+    const s = board.span();
+    return regionAt(v.cx, v.cy, s.w * k, s.h * k);
+  };
+
+  // 화면 크기를 처음 잰 뒤에 보이는 넓이의 70% 쯤에 뿌린다(둘레가 비어 있어야 끝없이 퍼지는 모습이 보인다)
+  function ready() {
+    if (!seeded && board.ready) {
+      seeded = true;
+      board.setView({ cx: 0, cy: 0, z: canvas.clientWidth < 560 ? 8 : ZOOM });
+      world.reseed(world.seed, viewRegion(0.7));
+    }
+    zoom.update(board.canZoom());
+    render(loop.progress());
+  }
+
+  function tick() {
+    if (world.step()) return;
+    setRunning(false);
+    if (world.full) {
+      flash.show(t("너무 넓게 퍼져서 멈췄어요. 흩뿌리기나 비우기로 다시 시작해 보세요."), 6000);
+      status.textContent = t("너무 넓게 퍼져서 멈췄어요. 흩뿌리기나 비우기로 다시 시작해 보세요.");
+    }
+  }
+
   function setRunning(on) {
+    if (on && !world.canRun()) on = false;
     if (on) loop.start();
     else loop.stop();
-    clear(playBtn).append(icon(on ? ICON.pause : ICON.play), h("span", { class: "label" }, on ? t("멈춤") : t("시작")));
-    playBtn.setAttribute("aria-label", on ? t("멈추기") : t("시작하기"));
+    capsule.setPlaying(on);
   }
 
   function stepOne() {
     setRunning(false);
-    world.step();
-    loop.pulse();
+    if (world.step()) loop.pulse();
+    else tick();
   }
 
   function goBack() {
-    if (world.back()) paint();
+    if (world.back()) {
+      status.textContent = TOOL_TIP[tool]();
+      paint();
+    }
   }
 
   function setTool(id) {
     tool = id;
     if (id !== "look") look = null;
     toolSeg.set(id);
-    stage.classList.toggle("looking", id === "look");
-    status.textContent =
-      id === "draw" ? t("칸을 누르거나 끌어서 그려요. 산 칸에서 시작하면 지워요.") : t("칸에 커서를 올리거나 눌러 보세요. 이웃을 세고 다음 세대를 알려 줘요.");
+    stage.dataset.tool = id;
+    status.textContent = TOOL_TIP[id]();
     paint();
   }
 
-  attachPen(canvas, {
-    cellAt: (cx, cy) => board.cellAt(cx, cy),
-    begin([x, y]) {
+  function zoomBy(f) {
+    board.zoomBy(f);
+    zoom.update(board.canZoom());
+    paint();
+  }
+
+  /** 산 칸이 모두 보이게. 비었으면 가운데로 */
+  function fitView() {
+    const b = world.bounds();
+    if (b) board.fit(b, { fill: 0.8, zmax: 24 });
+    else board.setView({ cx: 0, cy: 0, z: ZOOM });
+    zoom.update(board.canZoom());
+    paint();
+  }
+
+  attachNav(canvas, board, {
+    tool: () => tool,
+    wheel: "zoom",
+    touch: "full",
+    onTap([x, y]) {
       if (tool === "look") {
         look = look && look[0] === x && look[1] === y ? null : [x, y];
         paint();
-        return null;
+        return;
       }
-      const w = world.grid.w;
-      const v = world.cells[y * w + x] === 1 ? 0 : 1;
+      world.set(x, y, world.get(x, y) === 1 ? 0 : 1);
+      world.touched();
+      paint();
+    },
+    onStroke([x, y]) {
+      const v = world.get(x, y) === 1 ? 0 : 1;
       const put = ([cx, cy]) => {
-        world.cells[cy * w + cx] = v;
+        world.set(cx, cy, v);
         paint();
       };
       put([x, y]);
@@ -426,31 +458,23 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
         },
       };
     },
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (e.pointerType === "touch") return;
-    const c = board.cellAt(e.clientX, e.clientY);
-    if (String(c) !== String(hover)) {
+    onView() {
+      zoom.update(board.canZoom());
+      paint();
+    },
+    onHover(c) {
+      if (String(c) === String(hover)) return;
       hover = c;
       paint();
-    }
-  });
-  canvas.addEventListener("pointerleave", () => {
-    hover = null;
-    paint();
+    },
   });
 
   // ── 규칙 바꾸기 ─────────────────
   function setRule(r, { reseed = false } = {}) {
     rule = r;
     world.setRule(r);
-    if (world.grid.w !== gw() || world.grid.h !== gh()) {
-      world.resize(gw(), gh());
-      board.setGrid(world.grid.w, world.grid.h);
-      look = null;
-    }
     if (reseed) {
-      world.reseed();
+      world.reseed(randomSeed(), viewRegion(0.7));
       look = null;
     }
     recolor();
@@ -469,9 +493,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     notation.update(rule, { edited });
     say.textContent = describeRule(rule);
     restoreBtn.hidden = !edited;
-    edgeSeg.set(rule.grid.edges);
     statesOut.textContent = String(rule.states.length);
-    sizeSeg.set(rule.grid.width || rule.grid.height ? null : String(size));
     if (make) setTitle(t("{code} 만들기", { code }));
     syncUrl(code);
   }
@@ -480,7 +502,6 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   function syncUrl(code) {
     const q = new URLSearchParams();
     if (make || code !== formatNotation(lifeRule(base))) q.set("rule", code);
-    if (rule.grid.edges !== base.grid.edges) q.set("edges", rule.grid.edges);
     const path = make ? "#/make" : `#/r/${preset.id}`;
     const want = q.toString() ? `${path}?${q}` : path;
     if (location.hash !== want) history.replaceState(null, "", want);
@@ -495,9 +516,12 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     setRule(r);
   }
 
+  /** 표기를 적용한다. 틀리면 거짓, 돌릴 수 없는 규칙이면 그 까닭 */
   function setNotation(text) {
     const p = parseNotation(text);
     if (!p) return false;
+    const why = blockedReason(p);
+    if (why) return why;
     const r = copy(rule);
     r.birth = p.birth;
     r.survive = p.survive;
@@ -514,42 +538,30 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     setRule(r);
   }
 
-  function setEdges(edges) {
-    if (rule.grid.edges === edges) return;
-    const r = copy(rule);
-    r.grid.edges = edges;
-    setRule(r);
-  }
-
   function restore() {
     const r = copy(rule);
     r.birth = [...base.birth];
     r.survive = [...base.survive];
     r.states = copy(base.states);
-    r.grid.edges = base.grid.edges;
     setRule(r);
-  }
-
-  function setSize(n) {
-    size = n;
-    save("size", n);
-    const r = copy(rule);
-    delete r.grid.width;
-    delete r.grid.height;
-    setRule(r, { reseed: true });
   }
 
   function scatter() {
     const s = rule.seed;
-    world.scatter(s.type === "random" ? s.density : 0.3, randomSeed());
+    world.scatter(s.type === "random" ? s.density : 0.3, randomSeed(), viewRegion(0.7));
     look = null;
+    flash.hide();
+    status.textContent = TOOL_TIP[tool]();
     paint();
   }
 
+  /** 비우고 멈춘다: 이제 칸을 눌러 고른 뒤 재생하면 된다 */
   function clearAll() {
     setRunning(false);
     world.clear();
     look = null;
+    flash.hide();
+    status.textContent = TOOL_TIP[tool]();
     paint();
   }
 
@@ -568,6 +580,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     }
     const res = checkRuleFile(obj);
     if (res.errors) return res.errors;
+    const why = blockedReason(res.rule);
+    if (why) return [why];
     setRule(res.rule, { reseed: true });
     return [];
   }
@@ -624,18 +638,27 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   function act(x) {
     if (x.kind === "pattern") {
       look = null;
-      world.place(parseRLE(x.rle).rows);
+      const v = board.view();
+      world.place(parseRLE(x.rle).rows, Math.round(v.cx), Math.round(v.cy));
+      // 무늬가 화면의 3분의 1쯤 차게 맞춘다(날아가는 무늬도 한동안 보이게)
+      const b = world.bounds();
+      if (b) board.fit(b, { fill: 0.34, zmax: 16 });
+      zoom.update(board.canZoom());
       paint();
       setRunning(!reducedMotion());
     } else if (x.kind === "rule") {
       setNotation(x.notation);
       if (!loop.running && !reducedMotion()) setRunning(true);
     } else {
-      world.invert();
+      // 보이는 곳(너무 넓으면 가운데 160×120)만 뒤집는다
+      const r = viewRegion();
+      const w = Math.min(r.w, 160);
+      const hh = Math.min(r.h, 120);
+      world.invert(regionAt(r.x + r.w / 2, r.y + r.h / 2, w, hh));
       paint();
     }
     stage.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "center" });
-    // 다음에 누를 것은 대개 시작·멈춤이라, 스페이스가 바로 먹게 그 단추로 옮겨 간다
+    // 다음에 누를 것은 대개 재생·일시정지라, 스페이스가 바로 먹게 그 단추로 옮겨 간다
     playBtn.focus({ preventScroll: true });
   }
 
@@ -645,30 +668,36 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   };
   window.addEventListener("schemechange", onScheme);
 
-  board.setGrid(world.grid.w, world.grid.h);
   recolor();
   syncRule();
-  setTool("draw");
+  setTool("pan");
   setRunning(!reducedMotion());
 
   return {
     onKey(e) {
       if (e.altKey || e.ctrlKey || e.metaKey) return false;
       const el = e.target instanceof Element ? e.target : null;
-      if (e.key === " ") {
+      const k = e.key;
+      if (k === " ") {
         if (el && el.closest("button, a, summary")) return false; // 단추는 스스로 눌린다
         setRunning(!loop.running);
         return true;
       }
-      if (e.key === "ArrowRight") {
-        stepOne();
+      if (e.shiftKey && k.startsWith("Arrow")) {
+        // Shift+화살표: 화면 4분의 1씩 둘러보기
+        const r = canvas.getBoundingClientRect();
+        const d = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[k];
+        if (!d) return false;
+        board.panBy((d[0] * r.width) / 4, (d[1] * r.height) / 4);
+        paint();
         return true;
       }
-      if (e.key === "r" || e.key === "R") {
-        goBack();
-        return true;
-      }
-      if (e.key === "Escape" && look) {
+      if (k === "ArrowRight") return stepOne(), true;
+      if (k === "r" || k === "R") return goBack(), true;
+      if (k === "+" || k === "=") return zoomBy(1.25), true;
+      if (k === "-" || k === "_") return zoomBy(0.8), true;
+      if (k === "0") return fitView(), true;
+      if (k === "Escape" && look) {
         look = null;
         paint();
         return true;

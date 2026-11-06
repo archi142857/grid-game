@@ -55,7 +55,9 @@ test("틀린 규칙 파일은 무엇이 틀렸는지 알려 준다", () => {
     [{ ...ok, rule: { birth: [3] } }, /rule\.survive/],
     [{ ...ok, neighborhood: "hex" }, /neighborhood/],
     [{ ...ok, grid: { edges: "mirror" } }, /grid\.edges/],
-    [{ ...ok, grid: { edges: "wrap", width: 1 } }, /grid\.width/],
+    [{ ...ok, grid: { edges: "wrap" } }, /grid\.edges: Life/],
+    [{ ...ok, grid: { edges: "infinite", width: 64 } }, /grid\.width·height/],
+    [{ ...ok, rule: { birth: [0, 3], survive: [2, 3] } }, /rule\.birth: 끝없는/],
     [{ ...ok, seed: { type: "random" } }, /seed\.density/],
     [{ ...ok, seed: { type: "random", density: 0.2, area: 0 } }, /seed\.area/],
     [{ ...ok, seed: { type: "rle" } }, /seed\.data/],
@@ -75,7 +77,7 @@ test("검사한 규칙을 다시 파일로 쓰면 그대로 돌아온다", () =>
 test("빠진 항목은 기본값으로 채운다", () => {
   const { rule } = checkRuleFile({ family: "life", states: [{ name: "a" }, { name: "b" }], rule: { birth: [3, 3], survive: [3, 2] } });
   assert.equal(rule.id, "custom");
-  assert.equal(rule.grid.edges, "wrap");
+  assert.deepEqual(rule.grid, { edges: "infinite" });
   assert.equal(rule.neighborhood, "moore");
   assert.deepEqual(rule.seed, { type: "empty" });
   assert.deepEqual([rule.birth, rule.survive], [[3], [2, 3]]);

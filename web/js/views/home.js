@@ -1,17 +1,17 @@
-// 첫 화면: 살아 있는 격자와 규칙 점 단추, 한 세대가 지나는 세 단계, 그리고 도감.
+// 첫 화면: 끝없는 격자와 규칙 점 단추, 한 세대가 지나는 세 단계, 그리고 도감.
 
-import { h, clear, icon, ICON, reducedMotion, setTitle } from "../ui/dom.js";
+import { h, clear, reducedMotion, setTitle } from "../ui/dom.js";
 import { t, num } from "../i18n.js";
 import { formatNotation, neighborCells, liveNeighbors, makeTable, stepLife, explain } from "../core/life.js";
 import { lifeRule } from "../core/rules.js";
 import { randomSeed } from "../core/rng.js";
-import { makeWorld } from "../ui/world.js";
+import { makeWorld, regionAt } from "../ui/world.js";
 import { makeBoard } from "../ui/board.js";
 import { makeLoop, makePainter } from "../ui/loop.js";
-import { attachPen } from "../ui/pen.js";
+import { attachNav } from "../ui/nav.js";
 import { boardColors } from "../ui/theme.js";
 import { makeRulePad, describeRule } from "../ui/rulepad.js";
-import { segmented } from "../ui/widgets.js";
+import { segmented, zoomControls, flashLine, modKey, makeCapsule } from "../ui/widgets.js";
 import { newRuleArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { shortName, creditOf, tagOf, SOON } from "../data/catalog.js";
@@ -41,23 +41,32 @@ export function homeView(main, { presets }) {
   };
 }
 
-// ── 살아 있는 격자 ─────────────────
+// ── 끝없는 격자 ─────────────────
 
 function makeHero(presets) {
   let pick = presets[0]; // 고른 도감 규칙(점 단추로 고치면 null)
   let rule = copy(pick);
-  const world = makeWorld(rule, { w: 100, h: 42 });
-  let fitted = false;
+  const world = makeWorld(rule);
+  let seeded = false;
+  let auto = true; // 도감 규칙을 보여 주는 중: 잠잠해지거나 너무 퍼지면 새로 뿌린다. 칸을 손으로 바꾸면 끈다
   let hover = null;
+  let wantPlay = !reducedMotion();
+  let visible = true;
 
-  const canvas = h("canvas", { role: "img", "aria-label": t("살아 있는 격자. 칸을 누르거나 끌면 그려져요") });
-  const board = makeBoard(canvas, { onResize: () => fit() });
-  const playBtn = h("button", { class: "play", type: "button", onclick: () => setPlaying(!wantPlay) });
-  const againBtn = h(
-    "button",
-    { class: "icon-btn", type: "button", title: t("다시 뿌리기"), "aria-label": t("다시 뿌리기"), onclick: () => (world.reseed(randomSeed()), paint()) },
-    icon(ICON.shuffle),
-  );
+  const canvas = h("canvas", { role: "img", "aria-label": t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 살리거나 비워요") });
+  const board = makeBoard(canvas, { onResize: () => ready() });
+  const hint = h("p", { class: "stage-hint", hidden: true }, t("칸을 눌러 살릴 칸을 고른 다음, 재생을 눌러 보세요."));
+  const flash = flashLine();
+  const zoom = zoomControls({ onIn: () => zoomBy(1.25), onOut: () => zoomBy(0.8), onFit: () => fitView() });
+  const stage = h("div", { class: "stage" }, canvas, hint, flash.el, zoom.el);
+
+  const capsule = makeCapsule({
+    onPlay: () => setPlaying(!wantPlay),
+    onStep: () => stepOne(),
+    onBack: () => goBack(),
+    onScatter: () => scatter(),
+    onClear: () => clearAll(),
+  });
   const chips = segmented({
     label: t("이름난 규칙"),
     cls: "chips",
@@ -66,39 +75,38 @@ function makeHero(presets) {
     options: presets.map((p) => ({ id: p.id, name: shortName(p), title: formatNotation(lifeRule(p)) })),
     onChange: (id) => choose(id),
   });
-  const stage = h("div", { class: "stage" }, canvas);
-  const capsule = h("div", { class: "capsule" }, playBtn, againBtn, chips.el);
   const genNum = h("b", { class: "num" }, "0");
   const popNum = h("b", { class: "num" }, "0");
-  const pad = makeRulePad({ onToggle: toggle });
+  const pad = makeRulePad({ onToggle: toggle, onLocked: (why) => (say.textContent = why) });
   const say = h("p", { class: "say", "aria-live": "polite" });
   const note = h("p", { class: "console-note" });
 
-  let wantPlay = !reducedMotion();
-  let visible = true;
   const loop = makeLoop({ step: tick, draw: (p) => render(p), rate: () => 10 });
   const paint = makePainter(() => render(loop.progress()));
 
   function render(p = 1) {
-    board.draw(world.cells, world.prev, { t: p, hover });
+    board.draw(world, { t: p, hover });
     genNum.textContent = num(world.gen);
     popNum.textContent = num(world.count);
+    hint.hidden = world.count > 0;
   }
 
-  /** 무대 크기에 맞춰 칸 수를 정한다(칸 한 변이 넓은 화면 11px, 좁은 화면 8.5px 쯤) */
-  function fit() {
-    const r = canvas.getBoundingClientRect();
-    if (!r.width) return;
-    const cell = r.width < 560 ? 8.5 : 11;
-    const nw = Math.max(16, Math.round(r.width / cell));
-    const nh = Math.max(16, Math.round(r.height / cell));
-    if (nw !== world.grid.w || nh !== world.grid.h) world.resize(nw, nh);
-    board.setGrid(nw, nh);
-    if (!fitted) {
-      fitted = true;
-      world.reseed();
+  /** 보이는 넓이(칸 수) */
+  const viewRegion = (k = 1) => {
+    const v = board.view();
+    const s = board.span();
+    return regionAt(v.cx, v.cy, s.w * k, s.h * k);
+  };
+
+  // 화면 크기를 처음 잰 뒤에 보이는 만큼 뿌린다(칸 한 변이 넓은 화면 11px, 좁은 화면 8.5px 쯤)
+  function ready() {
+    if (!seeded && board.ready) {
+      seeded = true;
+      board.setView({ cx: 0, cy: 0, z: canvas.clientWidth < 560 ? 8.5 : 11 });
+      world.reseed(world.seed, viewRegion());
       for (let i = 0; i < 2; i++) world.step(); // 첫 모습부터 무늬가 보이게
     }
+    zoom.update(board.canZoom());
     render(1);
   }
 
@@ -107,12 +115,20 @@ function makeHero(presets) {
     paint();
   }
 
-  // 도감 규칙이 잠잠해지면(산 칸 수가 한동안 거의 그대로이거나 모두 죽으면) 새로 뿌린다
   function tick() {
-    world.step();
-    if (!pick) return;
+    if (!world.step()) {
+      // 너무 넓게 퍼졌다: 보여 주는 중이면 새로 뿌리고, 손으로 만든 것이면 멈춘다
+      if (auto && pick) return void world.reseed(randomSeed(), viewRegion());
+      setPlaying(false);
+      flash.show(t("너무 넓게 퍼져서 멈췄어요. 흩뿌리기나 비우기로 다시 시작해 보세요."), 4000);
+      return;
+    }
+    if (!auto || !pick) return;
     const a = world.alive;
-    if (world.count === 0 && world.gen > 20) return void world.reseed(randomSeed());
+    // 보여 주는 중에는 화면 네 배쯤 넘게 퍼지면 새로 뿌린다(첫 화면이 무거워지지 않게)
+    const s = board.span();
+    if (world.plane.size > Math.max(160, ((s.w / 32 + 2) * (s.h / 32 + 2)) * 4)) return void world.reseed(randomSeed(), viewRegion());
+    if (world.count === 0 && world.gen > 20) return void world.reseed(randomSeed(), viewRegion());
     if (world.gen < 300 || a.length < 150) return;
     let lo = Infinity;
     let hi = 0;
@@ -120,7 +136,7 @@ function makeHero(presets) {
       if (a[i] < lo) lo = a[i];
       if (a[i] > hi) hi = a[i];
     }
-    if (hi - lo <= Math.max(3, hi * 0.03)) world.reseed(randomSeed());
+    if (hi - lo <= Math.max(3, hi * 0.03)) world.reseed(randomSeed(), viewRegion());
   }
 
   function toggle(kind, n) {
@@ -139,8 +155,12 @@ function makeHero(presets) {
   function choose(id) {
     pick = presets.find((p) => p.id === id) ?? presets[0];
     rule = copy(pick);
+    auto = true;
     world.setRule(rule);
-    world.reseed(randomSeed());
+    // 다른 규칙을 고르면 처음 보던 크기로 돌아가 보이는 만큼 뿌린다
+    board.setView({ cx: 0, cy: 0, z: canvas.clientWidth < 560 ? 8.5 : 11 });
+    zoom.update(board.canZoom());
+    world.reseed(randomSeed(), viewRegion());
     recolor();
     sync();
   }
@@ -163,42 +183,70 @@ function makeHero(presets) {
   function update() {
     if (wantPlay && visible) loop.start();
     else loop.stop();
-    clear(playBtn).append(icon(wantPlay ? ICON.pause : ICON.play));
-    playBtn.setAttribute("aria-label", wantPlay ? t("멈추기") : t("움직이기"));
-    playBtn.title = wantPlay ? t("멈추기") : t("움직이기");
+    capsule.setPlaying(wantPlay);
   }
 
-  attachPen(canvas, {
-    cellAt: (x, y) => board.cellAt(x, y),
-    tapOnTouch: true,
-    begin([x, y]) {
-      const w = world.grid.w;
-      const v = world.cells[y * w + x] === 1 ? 0 : 1;
-      const put = ([cx, cy]) => {
-        world.cells[cy * w + cx] = v;
-        paint();
-      };
-      put([x, y]);
-      return {
-        move: put,
-        end: () => {
-          world.touched();
-          paint();
-        },
-      };
+  function stepOne() {
+    setPlaying(false);
+    if (world.step()) loop.pulse();
+    else paint();
+  }
+
+  function goBack() {
+    if (world.back()) paint();
+  }
+
+  function scatter() {
+    auto = true;
+    world.reseed(randomSeed(), viewRegion());
+    flash.hide();
+    paint();
+  }
+
+  /** 비우고 멈춘다: 이제 칸을 눌러 고른 뒤 재생하면 된다 */
+  function clearAll() {
+    auto = false;
+    world.clear();
+    setPlaying(false);
+    flash.hide();
+    paint();
+  }
+
+  function zoomBy(f) {
+    board.zoomBy(f);
+    zoom.update(board.canZoom());
+    paint();
+  }
+
+  /** 산 칸이 모두 보이게. 비었으면 가운데로 */
+  function fitView() {
+    const b = world.bounds();
+    if (b) board.fit(b, { fill: 0.8, zmax: 24 });
+    else board.setView({ cx: 0, cy: 0, z: 11 });
+    zoom.update(board.canZoom());
+    paint();
+  }
+
+  attachNav(canvas, board, {
+    tool: () => "pan",
+    wheel: "ctrl",
+    touch: "tap",
+    onTap([x, y]) {
+      auto = false;
+      world.set(x, y, world.get(x, y) === 1 ? 0 : 1);
+      world.touched();
+      paint();
     },
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (e.pointerType === "touch") return;
-    const c = board.cellAt(e.clientX, e.clientY);
-    if (String(c) !== String(hover)) {
+    onView() {
+      zoom.update(board.canZoom());
+      paint();
+    },
+    onHover(c) {
+      if (String(c) === String(hover)) return;
       hover = c;
       paint();
-    }
-  });
-  canvas.addEventListener("pointerleave", () => {
-    hover = null;
-    paint();
+    },
+    onHint: () => flash.show(t("{key}을 누른 채 휠을 굴리면 확대·축소돼요", { key: modKey() }), 1600),
   });
 
   // 화면 밖에 있으면 돌리지 않는다
@@ -218,9 +266,10 @@ function makeHero(presets) {
     h(
       "p",
       { class: "lead" },
-      t("칸마다 이웃 여덟 칸만 보고 다음 세대에 살지 죽을지 정해요. 이런 세계를 세포 자동자라고 해요. 아래 숫자를 누르면 격자가 바로 새 규칙을 따라요."),
+      t("칸마다 이웃 여덟 칸만 보고 다음 세대에 살지 죽을지 정해요. 이런 세계를 세포 자동자라고 해요. 격자는 끝없이 이어져서, 끌면 어디로든 둘러볼 수 있어요."),
     ),
-    h("div", { class: "hero-board" }, stage, capsule),
+    h("div", { class: "hero-rules" }, chips.el),
+    h("div", { class: "hero-board" }, stage, capsule.el),
     h(
       "div",
       { class: "console" },
@@ -242,9 +291,19 @@ function makeHero(presets) {
     el,
     recolor,
     onKey(e) {
-      if (e.key !== " " || e.target.closest?.("button, a, summary")) return false;
-      setPlaying(!wantPlay);
-      return true;
+      if (e.altKey || e.ctrlKey || e.metaKey) return false;
+      const k = e.key;
+      if (k === " ") {
+        if (e.target.closest?.("button, a, summary")) return false; // 단추는 스스로 눌린다
+        setPlaying(!wantPlay);
+        return true;
+      }
+      if (k === "ArrowRight" && !e.shiftKey) return stepOne(), true;
+      if (k === "r" || k === "R") return goBack(), true;
+      if (k === "+" || k === "=") return zoomBy(1.25), true;
+      if (k === "-" || k === "_") return zoomBy(0.8), true;
+      if (k === "0") return fitView(), true;
+      return false;
     },
     destroy() {
       loop.cancel();

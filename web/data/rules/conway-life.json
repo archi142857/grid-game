@@ -3,7 +3,7 @@
   "name": "콘웨이의 생명 게임",
   "description": "1970년 존 콘웨이가 만든 가장 유명한 세포 자동자예요. 두 줄짜리 규칙에서 기어가고, 깜빡이고, 끝없이 자라는 무늬가 나와요.",
   "family": "life",
-  "grid": { "edges": "wrap" },
+  "grid": { "edges": "infinite" },
   "neighborhood": "moore",
   "states": [{ "name": "빈칸" }, { "name": "산 칸" }],
   "rule": { "birth": [3], "survive": [2, 3] },

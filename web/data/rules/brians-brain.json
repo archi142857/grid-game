@@ -3,7 +3,7 @@
   "name": "브라이언의 뇌",
   "description": "켜진 칸은 한 세대 동안 꺼지는 중이었다가 꺼져요. 작은 우주선이 쉴 새 없이 날아다녀요.",
   "family": "life",
-  "grid": { "edges": "wrap" },
+  "grid": { "edges": "infinite" },
   "neighborhood": "moore",
   "states": [{ "name": "꺼짐" }, { "name": "켜짐" }, { "name": "꺼지는 중" }],
   "rule": { "birth": [2], "survive": [] },

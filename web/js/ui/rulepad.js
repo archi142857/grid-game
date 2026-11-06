@@ -32,17 +32,35 @@ export function describeRule(r) {
   return `${born}, ${live}${fade}`;
 }
 
-/** 태어남·살아남음 점 단추 두 줄. onToggle(kind, n) */
-export function makeRulePad({ onToggle }) {
+/** 끝없는 격자에서는 쓸 수 없는 숫자가 들어 있으면 그 까닭(없으면 null) */
+export function blockedReason(rule) {
+  return rule.birth.includes(0) ? NO_B0() : null;
+}
+const NO_B0 = () => t("끝없는 격자에서는 태어남 0을 쓸 수 없어요. 빈 곳이 끝없이 한꺼번에 태어나거든요.");
+
+/**
+ * 태어남·살아남음 점 단추 두 줄. onToggle(kind, n)
+ * 태어남 0 은 끝없는 격자에서 돌릴 수 없어 잠가 두고, 누르면 onLocked(까닭) 를 부른다.
+ */
+export function makeRulePad({ onToggle, onLocked = null }) {
   const rows = {};
   const row = (kind, name, letter, tip) => {
-    rows[kind] = Array.from({ length: 9 }, (_, n) =>
-      h(
+    rows[kind] = Array.from({ length: 9 }, (_, n) => {
+      const locked = kind === "birth" && n === 0;
+      return h(
         "button",
-        { type: "button", class: "count", "aria-pressed": "false", "aria-label": tip(n), title: tip(n), onclick: () => onToggle(kind, n) },
+        {
+          type: "button",
+          class: locked ? "count locked" : "count",
+          "aria-pressed": "false",
+          "aria-disabled": locked ? "true" : null,
+          "aria-label": locked ? `${tip(n)}. ${NO_B0()}` : tip(n),
+          title: locked ? NO_B0() : tip(n),
+          onclick: () => (locked ? onLocked && onLocked(NO_B0()) : onToggle(kind, n)),
+        },
         String(n),
-      ),
-    );
+      );
+    });
     return h(
       "div",
       { class: "pad-row", role: "group", "aria-label": name },
@@ -68,7 +86,10 @@ export function makeRulePad({ onToggle }) {
   };
 }
 
-/** 표기 입력(점 글꼴로 크게). Enter 나 칸 벗어나기로 적용, Esc 로 되돌린다. onCommit(text) 이 거짓이면 틀린 표기 */
+/**
+ * 표기 입력(점 글꼴로 크게). Enter 나 칸 벗어나기로 적용, Esc 로 되돌린다.
+ * onCommit(text) 이 true 면 적용, 글이면 그 글을 틀린 까닭으로 보이고, 거짓이면 읽을 수 없는 표기
+ */
 export function makeNotationField({ onCommit, label = t("규칙 표기") }) {
   const id = `nt-${++uid}`;
   const input = h("input", {
@@ -90,8 +111,8 @@ export function makeNotationField({ onCommit, label = t("규칙 표기") }) {
       return true;
     }
     const ok = onCommit(text);
-    err.textContent = ok ? "" : t("읽을 수 없는 표기예요. 예: B3/S23, B2/S/C3, 23/3");
-    return ok;
+    err.textContent = ok === true ? "" : typeof ok === "string" ? ok : t("읽을 수 없는 표기예요. 예: B3/S23, B2/S/C3, 23/3");
+    return ok === true;
   };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
