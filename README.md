@@ -137,6 +137,6 @@ docs/screenshots/             이 README 의 화면 캡처
 
 ## 만든 사람
 
-동물생명공학전공 25학번 이영표 · sanger.lee138@gmail.com
+서울대학교 동물생명공학전공 25학번 이영표 · sanger.lee138@gmail.com
 
 버그 제보와 새 규칙 제안은 [GitHub 이슈](https://github.com/Archi142857/grid-game/issues)에 남겨 주세요.
