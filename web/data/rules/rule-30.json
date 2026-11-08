@@ -1,13 +1,10 @@
 {
   "id": "rule-30",
   "name": "규칙 30",
-  "description": "한 줄짜리(1차원) 세포 자동자. 가운데 한 칸에서 시작해 세대가 아래로 쌓이는데, 규칙은 단순해도 무작위처럼 보이는 무늬가 나온다.",
+  "description": "한 줄짜리(1차원) 세포 자동자예요. 가운데 한 칸에서 시작해 세대가 아래로 쌓이는데, 규칙은 단순해도 무작위처럼 보이는 무늬가 나와요.",
   "family": "elementary",
-  "grid": { "width": 401, "height": 200, "edges": "wrap" },
-  "states": [
-    { "name": "꺼짐", "color": "#111418" },
-    { "name": "켜짐", "color": "#f2f2f2" }
-  ],
+  "grid": { "edges": "infinite" },
+  "states": [{ "name": "빈칸" }, { "name": "켜진 칸" }],
   "rule": { "number": 30 },
   "seed": { "type": "single" }
 }

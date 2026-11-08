@@ -1,0 +1,10 @@
+{
+  "id": "rule-90",
+  "name": "규칙 90",
+  "description": "양옆 두 칸 가운데 하나만 켜져 있으면 켜지는 1차원 규칙이에요. 한 칸에서 시작하면 시에르핀스키 삼각형이 끝없이 그려져요.",
+  "family": "elementary",
+  "grid": { "edges": "infinite" },
+  "states": [{ "name": "빈칸" }, { "name": "켜진 칸" }],
+  "rule": { "number": 90 },
+  "seed": { "type": "single" }
+}

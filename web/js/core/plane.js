@@ -266,6 +266,53 @@ export function makePlane() {
     for (const [k, t] of tiles) if (t.pop === 0 && t.prevPop === 0) tiles.delete(k);
   }
 
+  // ── 줄 단위(1차원이 쓴다) ─────────────────
+
+  /** 줄 y 에서 빈칸이 아닌 칸의 왼쪽·오른쪽 끝(양 끝 포함). 없으면 null */
+  function rowSpan(y) {
+    const ty = y >> SHIFT;
+    const r = (y & MASK) * S;
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    for (const t of tiles.values()) {
+      if (t.ty !== ty || !t.pop) continue;
+      const c = t.cells;
+      const ox = t.tx * S;
+      for (let x = 0; x < S; x++) {
+        if (!c[r + x]) continue;
+        if (ox + x < x0) x0 = ox + x;
+        if (ox + x > x1) x1 = ox + x;
+      }
+    }
+    return x0 === Infinity ? null : { x0, x1 };
+  }
+
+  /** 줄 y 의 x0–x1(양 끝 포함)을 배열로 읽는다 */
+  function readRow(y, x0, x1) {
+    const out = new Uint8Array(x1 - x0 + 1);
+    const ty = y >> SHIFT;
+    const r = (y & MASK) * S;
+    for (let tx = x0 >> SHIFT; tx <= x1 >> SHIFT; tx++) {
+      const t = tiles.get(keyOf(tx, ty));
+      if (!t || !t.pop) continue;
+      const ox = tx * S;
+      const a = Math.max(x0, ox);
+      const b = Math.min(x1, ox + MASK);
+      for (let x = a; x <= b; x++) out[x - x0] = t.cells[r + x - ox];
+    }
+    return out;
+  }
+
+  /** 줄 y 보다 위에만 걸친 조각을 통째로 지운다(y 바로 위 조각 안의 줄은 남는다) */
+  function dropAbove(y) {
+    for (const [k, t] of tiles) {
+      if (t.ty * S + MASK >= y) continue;
+      alive -= t.live;
+      filled -= t.pop;
+      tiles.delete(k);
+    }
+  }
+
   /** 지금 모습을 떠 둔다(처음으로 돌아갈 때 쓴다) */
   function snapshot() {
     const out = [];
@@ -327,6 +374,9 @@ export function makePlane() {
     bounds,
     clear,
     prune,
+    rowSpan,
+    readRow,
+    dropAbove,
     snapshot,
     restore,
     clampStates,

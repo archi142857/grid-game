@@ -1,14 +1,15 @@
 // 규칙 파일(JSON)을 검사하고 앱이 쓰는 꼴로 고른다. 형식은 기획서 5절과 계열 확장 설계 3절을 따른다.
 // 모든 계열이 끝없는 격자(grid.edges: infinite)에서 돈다. wrap·wall 은 파일 꼴에만 남아 있고 지금은 받지 않는다.
 // 상태 색(color)을 빼면 화면 색을 쓴다.
-// 앱 안의 규칙은 계열 내용을 맨 위로 꺼낸 꼴이다: Life 는 birth·survive, 개미는 turns 나 machine 과 agents.
+// 앱 안의 규칙은 계열 내용을 맨 위로 꺼낸 꼴이다: Life 는 birth·survive, 개미는 turns 나 machine 과 agents, 1차원은 number.
 
 import { t } from "../i18n.js";
 import { MIN_STATES, MAX_STATES, parseNotation, formatNotation } from "./life.js";
 import { MAX_ANT_COLORS, MAX_AGENTS, DIR_LETTERS, parseTurns, antRuleProblem } from "./ant.js";
+import { parseWolfram, formatWolfram, isLockedNumber } from "./elementary.js";
 
 /** 엔진이 아는 계열 */
-export const FAMILIES = ["life", "ant"];
+export const FAMILIES = ["life", "ant", "elementary"];
 /** 화면이 붙은 계열. checkRuleFile 은 따로 말하지 않으면 이것만 받는다(화면이 되면 프론트엔드 쪽지를 받고 넣는다) */
 export const READY_FAMILIES = ["life"];
 export const SEED_TYPES = ["empty", "random", "single", "rle"];
@@ -18,6 +19,7 @@ export const EDGES = ["infinite", "wrap", "wall"];
 const STATE_RANGE = {
   life: [MIN_STATES, MAX_STATES],
   ant: [2, MAX_ANT_COLORS],
+  elementary: [2, 2],
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -38,7 +40,7 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
   const [min, max] = STATE_RANGE[family];
   const states = obj.states;
   const statesOk = Array.isArray(states) && states.length >= min && states.length <= max;
-  if (!statesOk) errors.push(t("states: 상태는 {min}–{max}개여야 해요", { min, max }));
+  if (!statesOk) errors.push(min === max ? t("states: 이 계열은 상태가 {n}개예요", { n: min }) : t("states: 상태는 {min}–{max}개여야 해요", { min, max }));
   else {
     states.forEach((s, i) => {
       if (!s || typeof s !== "object" || typeof s.name !== "string") errors.push(t("states[{i}]: name 글이 있어야 해요", { i }));
@@ -71,6 +73,9 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
           if (!ok) errors.push(t("agents[{i}]: x·y 는 정수, dir 은 N·E·S·W 가운데 하나여야 해요", { i }));
         });
     }
+  } else if (family === "elementary") {
+    if (!(Number.isInteger(rule.number) && rule.number >= 0 && rule.number <= 255)) errors.push(t("rule.number: 0–255 사이 정수여야 해요"));
+    else if (isLockedNumber(rule.number)) errors.push(t("rule.number: 끝없는 격자에서는 홀수 번호(000 → 1)를 쓸 수 없어요"));
   }
 
   const grid = obj.grid ?? {};
@@ -106,7 +111,7 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
     if (rule.turns !== undefined) out.turns = rule.turns;
     else out.machine = clone(rule.machine);
     out.agents = (obj.agents ?? [{ x: 0, y: 0, dir: "N" }]).map((a) => ({ x: a.x, y: a.y, dir: a.dir }));
-  }
+  } else if (family === "elementary") out.number = rule.number;
   out.seed = { ...seed };
   return { rule: out };
 }
@@ -115,6 +120,7 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
 function ruleBody(r) {
   if (r.family === "life") return { birth: r.birth, survive: r.survive };
   if (r.family === "ant") return r.turns !== undefined ? { turns: r.turns } : { machine: r.machine };
+  if (r.family === "elementary") return { number: r.number };
   return {};
 }
 
@@ -136,6 +142,7 @@ export function toRuleFile(r) {
 export function defaultStateName(i, family = "life") {
   if (i === 0) return t("빈칸");
   if (family === "ant") return t("색 {k}", { k: i });
+  if (family === "elementary") return t("켜진 칸");
   if (i === 1) return t("산 칸");
   return t("사라지는 칸 {k}", { k: i - 1 });
 }
@@ -155,14 +162,16 @@ export const sameRule = (a, b) =>
   (a.family ?? "life") === (b.family ?? "life") && a.states.length === b.states.length && JSON.stringify(ruleBody(a)) === JSON.stringify(ruleBody(b));
 
 /**
- * 주소(?rule=)의 표기를 읽는다. 못 읽으면 null
- *   Life B3/S23 → { family: "life", birth, survive, states } · 개미 LLRR → { family: "ant", turns }
+ * 주소(?rule=)의 표기를 읽는다. 못 읽으면 null. 돌릴 수 없는 규칙(B0, 홀수 번호)도 읽기는 한다(lockOf 로 따로 본다)
+ *   Life B3/S23 → { family: "life", birth, survive, states } · 개미 LLRR → { family: "ant", turns } · 1차원 W30 → { family: "elementary", number }
  */
 export function parseCode(text) {
   const life = parseNotation(text);
   if (life) return { family: "life", ...life };
   const turns = parseTurns(text);
   if (turns) return { family: "ant", turns };
+  const number = parseWolfram(text);
+  if (number !== null) return { family: "elementary", number };
   return null;
 }
 
@@ -170,6 +179,18 @@ export function parseCode(text) {
 export function formatCode(r) {
   if (r.family === "life") return formatNotation(lifeRule(r));
   if (r.family === "ant") return r.turns ?? null;
+  if (r.family === "elementary") return formatWolfram(r.number);
+  return null;
+}
+
+/**
+ * 끝없는 격자에서 돌릴 수 없는 까닭. 돌릴 수 있으면 null. 화면 글은 프론트엔드가 이 낱말로 만든다
+ *   birth0: Life 의 태어남 0 · odd: 1차원의 홀수 번호(000 → 1)
+ * parseCode 의 결과에도 쓸 수 있다
+ */
+export function lockOf(r) {
+  if (r.family === "life" && r.birth.includes(0)) return "birth0";
+  if (r.family === "elementary" && isLockedNumber(r.number)) return "odd";
   return null;
 }
 

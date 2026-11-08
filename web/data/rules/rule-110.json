@@ -1,0 +1,10 @@
+{
+  "id": "rule-110",
+  "name": "규칙 110",
+  "description": "되풀이되는 바탕 위로 여러 모양이 오가며 부딪치는 1차원 규칙이에요. 이 규칙 하나로 어떤 계산이든 할 수 있다는 것(튜링 완전)이 증명됐어요.",
+  "family": "elementary",
+  "grid": { "edges": "infinite" },
+  "states": [{ "name": "빈칸" }, { "name": "켜진 칸" }],
+  "rule": { "number": 110 },
+  "seed": { "type": "random", "density": 0.5 }
+}

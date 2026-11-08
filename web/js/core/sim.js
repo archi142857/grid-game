@@ -6,10 +6,12 @@
 import { makePlane, REACH } from "./plane.js";
 import { makeTable, explain as lifeExplain } from "./life.js";
 import { compileAnt, stepAnts, MAX_AGENTS, TURN_LETTERS, DIR_LETTERS } from "./ant.js";
+import { stepRow, rowsKept, isLockedNumber, patternOf, nextOf, MAX_WIDTH } from "./elementary.js";
 import { parseRLE } from "./rle.js";
 import { lifeRule } from "./rules.js";
 
 export { MAX_ANT_COLORS, MAX_ANT_STATES, MAX_AGENTS } from "./ant.js";
+export { ROWS_MIN, ROWS_MAX, MAX_WIDTH, rowsKept } from "./elementary.js";
 
 /** 쓰는 조각(32×32)이 이만큼을 넘으면(약 100만 칸) 너무 넓게 퍼진 것으로 보고 멈춘다 */
 export const MAX_TILES = 1024;
@@ -28,7 +30,7 @@ export const around = (x, y) => [
   [x + 1, y + 1],
 ];
 
-const BUILD = { life: lifeSim, ant: antSim };
+const BUILD = { life: lifeSim, ant: antSim, elementary: elementarySim };
 
 /** 이 엔진이 sim 으로 돌릴 수 있는 계열 */
 export const SIM_FAMILIES = Object.keys(BUILD);
@@ -394,6 +396,197 @@ function antSim(rule) {
       const a = agents[i];
       const j = a.state * k + c;
       return { now, next: prog.write[j], why: "ant", agent: i, turn: TURN_LETTERS[prog.turn[j]], write: prog.write[j], state: a.state, cells: [] };
+    },
+  };
+  return sim;
+}
+
+// ── 1차원 기본 ─────────────────
+// 세대 t 의 줄은 y = t(0세대 줄이 y = 0). 한 걸음에 지금 줄(head) 아래에 새 줄을 하나 만든다.
+// 오래된 줄은 조각째로 지운다(지금 줄이 넓을수록 적게 남긴다, rowsKept). 손으로는 지금 줄만 바꿀 수 있다.
+
+function elementarySim(rule) {
+  const P = makePlane();
+  let r = rule;
+  let head = 0; // 지금 줄의 y
+  let top = 0; // 남아 있는 가장 위 줄의 y(그 위는 지웠다)
+  let ones = 0; // 지금 줄의 켜진 칸 수
+  let wide = false; // 지금 줄이 MAX_WIDTH 를 넘었다
+
+  function countRow(y) {
+    const span = P.rowSpan(y);
+    if (!span) return 0;
+    let n = 0;
+    for (const v of P.readRow(y, span.x0, span.x1)) if (v === 1) n++;
+    return n;
+  }
+  function rowWidth(y) {
+    const span = P.rowSpan(y);
+    return span ? span.x1 - span.x0 + 1 : 0;
+  }
+  /** 0세대 줄에 칸 배열을 (cx 가운데에) 놓는다 */
+  function putRow(row, cx) {
+    const x0 = Math.round(cx - row.length / 2);
+    row.forEach((v, i) => v === 1 && P.set(x0 + i, 0, 1));
+  }
+  /** region 의 너비 가운데 area 몫에 density 확률로 0세대 줄을 켠다 */
+  function fillRow(region, density, area, rng) {
+    const aw = Math.max(1, Math.round(region.w * area));
+    const x0 = region.x + Math.floor((region.w - aw) / 2);
+    for (let x = x0; x < x0 + aw; x++) if (rng.next() < density) P.set(x, 0, 1);
+  }
+  function settle() {
+    ones = countRow(head);
+    wide = rowWidth(head) > MAX_WIDTH;
+  }
+
+  const sim = {
+    family: "elementary",
+    get rule() {
+      return r;
+    },
+    /** 홀수 번호(000 → 1)는 빈 곳이 한꺼번에 켜져서 끝없는 격자에서는 돌릴 수 없다 */
+    canRun: () => !isLockedNumber(r.number),
+    /** 지금 줄이 MAX_WIDTH(8192칸)보다 넓다 */
+    get full() {
+      return wide || head + 1 >= REACH;
+    },
+
+    /** 새 줄을 n 개(기본 1) 만든다. 못 가면 null. → { alive(지금 줄의 켜진 칸), changed(윗줄과 다른 칸), steps } */
+    step(n = 1) {
+      if (!sim.canRun() || sim.full) return null;
+      let changed = 0;
+      let k = 0;
+      while (k < n) {
+        const span = P.rowSpan(head);
+        let next = 0;
+        let w = 0;
+        if (span) {
+          // 지금 줄의 x0-2 … x1+2 를 읽어 다음 줄의 x0-1 … x1+1 을 만든다
+          const row = P.readRow(head, span.x0 - 2, span.x1 + 2);
+          const out = stepRow(row, r.number);
+          const ox = span.x0 - 1;
+          let a = -1;
+          let b = -1;
+          for (let i = 0; i < out.length; i++) {
+            if (out[i]) {
+              P.set(ox + i, head + 1, 1);
+              next++;
+              if (a < 0) a = i;
+              b = i;
+            }
+            if (out[i] !== row[i + 1]) changed++;
+          }
+          w = a < 0 ? 0 : b - a + 1;
+        }
+        head++;
+        ones = next;
+        k++;
+        const cut = head - rowsKept(w) + 1;
+        if (cut > top) {
+          P.dropAbove(cut);
+          top = Math.max(top, (cut >> 5) << 5);
+        }
+        if (w > MAX_WIDTH) {
+          wide = true;
+          break;
+        }
+        if (head + 1 >= REACH) break;
+      }
+      return { alive: ones, changed, steps: k };
+    },
+
+    get: (x, y) => P.get(x, y),
+    /** 지금 줄(head)의 칸만 바꾼다(0·1). 원래 값을 돌려준다 */
+    set(x, y, v) {
+      if (y !== head || (v !== 0 && v !== 1)) return P.get(x, y);
+      const old = P.set(x, y, v);
+      ones += (v === 1 ? 1 : 0) - (old === 1 ? 1 : 0);
+      wide = rowWidth(head) > MAX_WIDTH;
+      return old;
+    },
+    /** 그리기용. 앞 칸은 늘 null(지금 줄은 화면이 head 로 따로 그린다) */
+    blocks(x0, y0, x1, y1, fn) {
+      P.blocks(x0, y0, x1, y1, (ox, oy, s, cells) => fn(ox, oy, s, s, cells, null));
+    },
+    bounds: () => P.bounds(),
+
+    agents: NONE,
+    /** 지금 줄의 y */
+    get head() {
+      return head;
+    },
+    /** 남아 있는 가장 위 줄의 y */
+    get top() {
+      return top;
+    },
+    /** 지금 줄의 켜진 칸 수 */
+    get alive() {
+      return ones;
+    },
+    get size() {
+      return P.size;
+    },
+
+    snapshot: () => ({ family: "elementary", states: 2, head, top, cells: P.snapshot() }),
+    restore(snap) {
+      P.restore(snap.cells);
+      head = snap.head;
+      top = snap.top;
+      settle();
+    },
+    /** 같은 계열 안에서 번호만 바꾼다(줄은 그대로) */
+    setRule(next) {
+      if (next.family !== "elementary") throw new Error(`setRule: 계열이 달라요 (elementary → ${next.family}). 새 sim 을 만들어 주세요`);
+      r = next;
+    },
+    clear() {
+      P.clear();
+      head = 0;
+      top = 0;
+      ones = 0;
+      wide = false;
+    },
+
+    /** 비우고 0세대 줄(y = 0)을 seed 대로: single 은 가운데 한 칸, random 은 region 너비(× area)에, rle 는 첫 줄만 */
+    seed(region, rng) {
+      sim.clear();
+      const s = r.seed ?? { type: "empty" };
+      if (s.type === "random") fillRow(region, s.density ?? 0.5, s.area ?? 1, rng);
+      else if (s.type === "single") P.set(region.x + (region.w >> 1), 0, 1);
+      else if (s.type === "rle") putRow(parseRLE(s.data).rows[0] ?? [], region.x + region.w / 2);
+      settle();
+    },
+    /** 비우고 0세대 줄에만 무작위로 흩뿌린다 */
+    scatter(region, density, rng) {
+      sim.clear();
+      const s = r.seed;
+      fillRow(region, density, s && s.type === "random" ? (s.area ?? 1) : 1, rng);
+      settle();
+    },
+    /** 비우고 무늬의 첫 줄을 0세대 줄의 cx 가운데에 놓는다(cy 는 쓰지 않는다) */
+    place(rows, cx = 0) {
+      sim.clear();
+      putRow(rows[0] ?? [], cx);
+      settle();
+    },
+
+    /**
+     * 살펴보기: 칸 (x, y) 가 윗줄의 세 칸에서 어떻게 정해지는지. { now, next, why, pattern, cells }
+     *   why: rule(윗줄에서 정해졌다) · next(다음 걸음에 만들 줄) · start(0세대 줄) · none(아직 없거나 지운 줄)
+     *   pattern: 윗줄 세 칸의 무늬 번호 0–7(111 이 7), next: 규칙이 정하는 값, cells: 윗줄 세 칸 자리
+     */
+    explain(x, y) {
+      const now = P.get(x, y);
+      if (y === 0 && top === 0) return { now, next: now, why: "start", pattern: null, cells: [] };
+      if (y <= top || y > head + 1) return { now, next: now, why: "none", pattern: null, cells: [] };
+      const cells = [
+        [x - 1, y - 1],
+        [x, y - 1],
+        [x + 1, y - 1],
+      ];
+      const pattern = patternOf(P.get(x - 1, y - 1), P.get(x, y - 1), P.get(x + 1, y - 1));
+      return { now, next: nextOf(r.number, pattern), why: y === head + 1 ? "next" : "rule", pattern, cells };
     },
   };
   return sim;
