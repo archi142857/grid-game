@@ -210,6 +210,10 @@ with sync_playwright() as p:
     center_into_view(page, ".hero .stage")
     cv = box(page, ".hero canvas")
     t.drag(cv["x"] + cv["w"] * 0.2, cv["y"] + cv["h"] / 2, cv["x"] + cv["w"] * 0.8, cv["y"] + cv["h"] / 2 + 4)
+    try:  # 2.4초 떠 있으니 뜰 때까지 조금 기다린다(바쁜 기계에서 늦게 뜰 수 있다)
+        fl.wait_for(state="visible", timeout=2000)
+    except Exception:
+        pass
     check("phone home: sideways drag shows a hint", fl.is_visible(), fl.text_content() if fl.count() else "")
     page.screenshot(path=f"{a.out}/phone390_touch_hint.png")
     ctx.close()

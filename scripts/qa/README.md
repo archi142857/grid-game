@@ -24,6 +24,13 @@ python3 scripts/qa/regress.py http://localhost:8000/   # 쪽지로 보낸 버그
 python3 scripts/qa/life.py    http://localhost:8000/   # Life 가 그대로인지(엔진을 바꾸기 전후에)
 ```
 
+```
+python3 scripts/qa/pixels.py  앞_주소 뒤_주소          # 두 판의 격자 그림을 같은 장면에서 픽셀로 견주기(board 를 바꿀 때)
+python3 scripts/qa/perf.py    [주소] [--quick] [--only CPU]   # 큰 판에서 한 장 그리는 시간(WebGL 판단)
+```
+
+앞 판은 `git worktree add /tmp/old <커밋>` 으로 꺼내 다른 포트에 띄우면 된다.
+
 `life.py` 는 무늬 카드를 놓고 → 로 넘겨 산 칸 수를 `life_baseline.json` 과 견준다. 기준값은 11/8 사이트에서 저장했고 작은 파이썬 시뮬레이터로 따로 셈해 맞춰 봤다. 엔진(`world.js`·`sim.js`)을 바꾸는 세션은 올리기 전에 로컬 `web/` 에 돌려 보면 된다. 무늬 카드가 바뀌면 `--save` 로 기준값을 새로 쓴다.
 
 결과(캡처, `<이름>.json`)는 `--out` 폴더(기본은 임시 폴더의 `grid-qa`)에 쌓인다. 실패가 하나라도 있으면 1 로 끝난다.
@@ -36,3 +43,5 @@ python3 scripts/qa/life.py    http://localhost:8000/   # Life 가 그대로인�
 | `phone.py` | 첫 화면·규칙 화면을 손가락으로(쓸기, 핀치, 그리기, 전체 화면) |
 | `regress.py` | 검수가 보낸 버그 쪽지를 다시 확인, 고친 뒤 생길 수 있는 것, 화면마다 글씨 대비 |
 | `life.py`, `life_baseline.json` | 알려진 답(R-펜토미노 1103세대 116칸, 글라이더 총)과 무늬 카드마다의 산 칸 수 기준값 |
+| `pixels.py` | 두 판의 격자 그림 견주기: 점·네모·픽셀·모두 보이게, 세대가 넘어가는 중간 그림(시계를 멈춰서)까지 |
+| `perf.py` | 전체 화면·칸 1/2/10px·약 100만 칸에서 끌기(그리기만)와 빠르게 돌기의 한 장 시간. PC dpr 1·2, 폰 dpr 3(CPU 4배 느리게도) |
