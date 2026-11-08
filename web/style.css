@@ -30,6 +30,16 @@
   --wrap: 1200px;
   --gutter: clamp(20px, 4vw, 40px);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* 새 계열(개미·1차원·조건표) 판의 점. theme.js 가 숫자로 읽는다.
+     반지름은 칸 한 변에 대한 비율이고 가장 큰 점은 산 칸과 같은 0.4.
+     점이 작을수록 옅다: 진하기 = --dot-tone-min(가장 작은 점) … 1(0.4), 빈칸 점 색에서 잉크·신호색 쪽으로 */
+  --dot-r-min: 0.14; /* 가장 작은 점(개미 1번 색, 오래된 1차원 줄) */
+  --dot-tone-min: 0.6;
+  --tail-r: 0.25; /* 와이어월드 전자 꼬리 */
+  --wire-r: 0.16; /* 와이어월드 도선 */
+  --row-keep: 4; /* 1차원: 새 줄 다음 이만큼은 그대로 */
+  --row-fade: 17; /* 그 뒤 이만큼의 줄에 걸쳐 가장 작은 점까지 줄어든다 */
 }
 
 :root[data-scheme="dark"] {
@@ -1602,6 +1612,235 @@ html.has-full body {
   }
 }
 
+/* ── 새 계열: 상태 견본, 편집기, 도감 묶음 ───────────────────────────── */
+/* 상태 견본: 판의 점과 같은 모양. JS 가 --r(칸 한 변에 대한 반지름, 0–0.4)을 준다.
+   신호색 상태는 .signal, 빈칸은 .empty. 진하기는 판처럼 점 크기에서 나온다 */
+.swatch {
+  --r: 0.4;
+  --tone: clamp(var(--dot-tone-min), calc(var(--dot-tone-min) + (1 - var(--dot-tone-min)) * (var(--r) - var(--dot-r-min)) / (0.4 - var(--dot-r-min))), 1);
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--ink) calc(var(--tone) * 100%), var(--dot-0));
+}
+.swatch::before {
+  content: "";
+  width: calc(var(--r) * 200%);
+  height: calc(var(--r) * 200%);
+  min-width: 3px;
+  min-height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.swatch.signal {
+  color: color-mix(in srgb, var(--signal) calc(var(--tone) * 100%), var(--dot-0));
+}
+.swatch.empty {
+  --r: 0.1;
+  color: var(--dot-0);
+}
+
+/* 회전 글자(개미): 숫자 점과 같은 줄. .turns 안에 .pad-row 를 칸 색마다 하나씩,
+   글자는 .count 단추 넷(L R N U), 고른 것이 aria-pressed */
+.turns {
+  display: grid;
+  gap: 10px;
+}
+.turns .pad-row {
+  grid-template-columns: 6.6em minmax(0, 1fr);
+}
+.turns .pad-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.turns .counts {
+  max-width: 190px;
+}
+.turns .count {
+  max-width: 40px;
+  font-size: 0.9375rem;
+}
+
+/* 무늬 8개(1차원): 111 부터 000 까지. 위에 이웃 세 칸(.pat-in 의 i, 켜진 칸은 .on), 아래에 결과 단추(.count) */
+.pats {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px 6px;
+}
+.pat {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+.pat-in {
+  display: flex;
+  gap: 2px;
+}
+.pat-in i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-0);
+}
+.pat-in i.on {
+  background: var(--ink);
+}
+.pat .count {
+  flex: none;
+  width: 100%;
+  max-width: 32px;
+}
+
+/* 조건표 줄: [지금 상태] → [다음 상태], 그 아래 조건(이웃의 [상태]가 [0–8]개면) 또는 '늘'.
+   조건의 상태 단추와 조사는 .tr-of 로 묶어 붙인다 */
+.trs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.tr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--r-m);
+  background: var(--board);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: 550;
+}
+.tr-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--raise);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font-weight: 650;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.tr-st:hover {
+  box-shadow: inset 0 0 0 1px var(--ink-4);
+}
+.tr-to,
+.tr-always {
+  color: var(--ink-3);
+}
+.tr-always {
+  font-size: 0.8125rem;
+}
+.tr-when {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.tr-of {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tr-when .counts {
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.tr-when .count {
+  flex: none;
+  width: 25px;
+  max-width: 25px;
+  font-size: 0.75rem;
+}
+.tr-del {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: none;
+  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+}
+.tr-del:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+/* 칠할 상태: 견본 + 이름 알약. segmented({ cls: "paints", item: "paint" }) 꼴(고른 것이 aria-checked) */
+.paints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.paint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--board);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.paint:hover {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink-4);
+}
+.paint[aria-checked="true"] {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+/* 도감 묶음: 계열마다 머리(이름 · 규칙 수 · 한 줄)와 .specimens */
+.shelf-group + .shelf-group {
+  margin-top: clamp(44px, 6vw, 72px);
+}
+.shelf-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding-top: 16px;
+  margin-bottom: 22px;
+  border-top: 1px solid var(--line);
+}
+.shelf-head h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.shelf-count {
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.shelf-head p {
+  margin: 0 0 0 auto;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
 /* ── 좁은 화면 ───────────────────────────── */
 @media (max-width: 1024px) {
   .specimens {
@@ -1618,6 +1857,10 @@ html.has-full body {
   }
 }
 @media (max-width: 760px) {
+  .shelf-head p {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
   .hero .stage,
   .bench .stage {
     height: auto;
@@ -1764,9 +2007,18 @@ html.has-full body {
   .stage-flash {
     border: 1px solid CanvasText;
   }
+  .tr,
+  .tr-st,
+  .paint {
+    border: 1px solid CanvasText;
+  }
+  .swatch::before {
+    background: CanvasText;
+  }
   .count[aria-pressed="true"],
   .seg button[aria-checked="true"],
-  .chip[aria-checked="true"] {
+  .chip[aria-checked="true"],
+  .paint[aria-checked="true"] {
     background: Highlight;
     color: HighlightText;
   }
