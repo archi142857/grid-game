@@ -9,6 +9,7 @@ import { compileAnt, stepAnts, MAX_AGENTS, TURN_LETTERS, DIR_LETTERS } from "./a
 import { stepRow, rowsKept, isLockedNumber, patternOf, nextOf, MAX_WIDTH } from "./elementary.js";
 import { compileTable, matchRow } from "./table.js";
 import { nextColor, cyclicNeighbors } from "./cyclic.js";
+import { codeLayout, codeIndex } from "./code.js";
 import { parseRLE } from "./rle.js";
 import { lifeRule } from "./rules.js";
 
@@ -16,6 +17,7 @@ export { MAX_ANT_COLORS, MAX_ANT_STATES, MAX_AGENTS } from "./ant.js";
 export { ROWS_MIN, ROWS_MAX, MAX_WIDTH, rowsKept } from "./elementary.js";
 export { MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED } from "./table.js";
 export { MAX_CYCLIC_STATES, CYCLIC_THRESHOLD } from "./cyclic.js";
+export { MIN_CODE_STATES, MAX_CODE_STATES, MAX_SOURCE, EXAMPLE_SOURCE } from "./code.js";
 
 /** 쓰는 조각(32×32)이 이만큼을 넘으면(약 100만 칸) 너무 넓게 퍼진 것으로 보고 멈춘다 */
 export const MAX_TILES = 1024;
@@ -35,7 +37,7 @@ export const around = (x, y) => [
   [x + 1, y + 1],
 ];
 
-const BUILD = { life: lifeSim, ant: antSim, elementary: elementarySim, table: tableSim, cyclic: cyclicSim };
+const BUILD = { life: lifeSim, ant: antSim, elementary: elementarySim, table: tableSim, cyclic: cyclicSim, code: codeSim };
 
 /** 이 엔진이 sim 으로 돌릴 수 있는 계열 */
 export const SIM_FAMILIES = Object.keys(BUILD);
@@ -148,7 +150,38 @@ function cyclicSim(rule) {
   });
 }
 
-/** 표로 돌리는 계열(Life·조건표)과 순환이 함께 쓰는 sim */
+function codeSim(rule) {
+  return cellSim(rule, {
+    family: "code",
+    /** 표(rule.table)는 Worker 가 코드로 만들어 규칙에 실어 준다. 없으면 돌리지 않는다 */
+    compile(r) {
+      const L = codeLayout(r.states.length);
+      const ok = r.table instanceof Uint8Array && r.table.length === r.states.length * L.V;
+      return { table: ok ? r.table : null, weights: L.weights, stride: L.V, opts: { compact: L.compact }, layout: L };
+    },
+    canRun: (prog) => !!prog.table && prog.table[0] === 0,
+    advance: (P, prog) => (prog.table ? P.step(prog.table, prog.weights, prog.stride, prog.opts) : null),
+    /** 흩뿌리기·random 뿌리기는 빈칸이 아닌 상태 가운데 무작위로 */
+    pick: (rng, states) => () => 1 + rng.int(states - 1),
+    /**
+     * 살펴보기: { now, next, why, counts, cells }
+     *   why: code(표대로) · notable(표가 아직 없음). counts: 상태마다 이웃 수(무어 8칸), cells: 이웃 8칸 자리
+     */
+    explain(P, r, x, y, prog) {
+      const cells = around(x, y);
+      const counts = new Array(r.states.length).fill(0);
+      for (const [a, b] of cells) {
+        const v = P.get(a, b);
+        if (v < counts.length) counts[v]++;
+      }
+      const now = P.get(x, y);
+      if (!prog.table) return { now, next: now, why: "notable", counts, cells };
+      return { now, next: prog.table[now * prog.stride + codeIndex(counts, prog.layout)], why: "code", counts, cells };
+    },
+  });
+}
+
+/** 표로 돌리는 계열(Life·조건표·코드)과 순환이 함께 쓰는 sim */
 function cellSim(rule, kind) {
   const P = makePlane();
   let r = rule;

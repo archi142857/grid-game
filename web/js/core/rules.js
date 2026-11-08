@@ -2,7 +2,7 @@
 // 모든 계열이 끝없는 격자(grid.edges: infinite)에서 돈다. wrap·wall 은 파일 꼴에만 남아 있고 지금은 받지 않는다.
 // 상태 색(color)을 빼면 화면 색을 쓴다.
 // 앱 안의 규칙은 계열 내용을 맨 위로 꺼낸 꼴이다: Life 는 birth·survive, 개미는 turns 나 machine 과 agents, 1차원은 number,
-// 조건표는 transitions, 순환은 threshold.
+// 조건표는 transitions, 순환은 threshold, 코드는 source(표 table 은 Worker 가 만들어 실어 주고 파일에는 넣지 않는다).
 
 import { t } from "../i18n.js";
 import { MIN_STATES, MAX_STATES, parseNotation, formatNotation } from "./life.js";
@@ -10,9 +10,10 @@ import { MAX_ANT_COLORS, MAX_AGENTS, DIR_LETTERS, parseTurns, antRuleProblem } f
 import { parseWolfram, formatWolfram, isLockedNumber } from "./elementary.js";
 import { MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED, tableProblem, compileTable, WIREWORLD, isWireworld } from "./table.js";
 import { MAX_CYCLIC_STATES, CYCLIC_THRESHOLD } from "./cyclic.js";
+import { MIN_CODE_STATES, MAX_CODE_STATES, MAX_SOURCE, codeLocked } from "./code.js";
 
 /** 엔진이 아는 계열 */
-export const FAMILIES = ["life", "ant", "elementary", "table", "cyclic"];
+export const FAMILIES = ["life", "ant", "elementary", "table", "cyclic", "code"];
 /** 화면이 붙은 계열. checkRuleFile 은 따로 말하지 않으면 이것만 받는다(화면이 되면 프론트엔드 쪽지를 받고 넣는다) */
 export const READY_FAMILIES = ["life"];
 export const SEED_TYPES = ["empty", "random", "single", "rle"];
@@ -25,6 +26,7 @@ const STATE_RANGE = {
   elementary: [2, 2],
   table: [2, MAX_TABLE_STATES],
   cyclic: [3, MAX_CYCLIC_STATES],
+  code: [MIN_CODE_STATES, MAX_CODE_STATES],
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -98,6 +100,11 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
     if (!top) errors.push(t("neighborhood: 순환은 moore 나 von-neumann 이에요"));
     else if (!(Number.isInteger(rule.threshold) && rule.threshold >= 1 && rule.threshold <= top))
       errors.push(t("rule.threshold: 1–{max} 사이 정수여야 해요", { max: top }));
+  } else if (family === "code") {
+    neighborhood = obj.neighborhood ?? "moore";
+    if (neighborhood !== "moore") errors.push(t("neighborhood: 지금은 moore 만 돼요"));
+    if (typeof rule.source !== "string" || !rule.source.trim()) errors.push(t("rule.source: 코드 글이 있어야 해요"));
+    else if (rule.source.length > MAX_SOURCE) errors.push(t("rule.source: 코드는 {max}자까지예요", { max: MAX_SOURCE }));
   }
 
   const grid = obj.grid ?? {};
@@ -136,6 +143,7 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
   } else if (family === "elementary") out.number = rule.number;
   else if (family === "table") out.transitions = clone(rule.transitions);
   else if (family === "cyclic") out.threshold = rule.threshold;
+  else if (family === "code") out.source = rule.source;
   out.seed = { ...seed };
   return { rule: out };
 }
@@ -147,6 +155,7 @@ function ruleBody(r) {
   if (r.family === "elementary") return { number: r.number };
   if (r.family === "table") return { transitions: r.transitions };
   if (r.family === "cyclic") return { threshold: r.threshold };
+  if (r.family === "code") return { source: r.source };
   return {};
 }
 
@@ -170,7 +179,7 @@ export function defaultStateName(i, family = "life") {
   if (family === "cyclic") return t("색 {k}", { k: i });
   if (family === "ant") return t("색 {k}", { k: i });
   if (family === "elementary") return t("켜진 칸");
-  if (family === "table") return t("상태 {k}", { k: i });
+  if (family === "table" || family === "code") return t("상태 {k}", { k: i });
   if (i === 1) return t("산 칸");
   return t("사라지는 칸 {k}", { k: i - 1 });
 }
@@ -219,13 +228,15 @@ export function formatCode(r) {
 
 /**
  * 끝없는 격자에서 돌릴 수 없는 까닭. 돌릴 수 있으면 null. 화면 글은 프론트엔드가 이 낱말로 만든다
- *   birth0: Life 의 태어남 0 · odd: 1차원의 홀수 번호(000 → 1) · empty: 조건표에서 이웃 없는 빈칸이 바뀜
+ *   birth0: Life 의 태어남 0 · odd: 1차원의 홀수 번호(000 → 1) · empty: 조건표·코드에서 이웃 없는 빈칸이 바뀜
+ *   코드 규칙은 표(table)를 실은 뒤에만 볼 수 있다(표가 없으면 null, 그때는 sim.canRun() 이 거짓)
  * parseCode 의 결과에도 쓸 수 있다
  */
 export function lockOf(r) {
   if (r.family === "life" && r.birth.includes(0)) return "birth0";
   if (r.family === "elementary" && isLockedNumber(r.number)) return "odd";
   if (r.family === "table" && compileTable(r.transitions, r.states.length).table[0] !== 0) return "empty";
+  if (r.family === "code" && r.table && codeLocked(r.table)) return "empty";
   return null;
 }
 
