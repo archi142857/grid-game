@@ -36,7 +36,7 @@
 | 브라이언의 뇌 | B2/S/C3 | 꺼지는 칸이 꼬리를 남기며 날아다닌다 |
 | 스타워즈 | B2/S345/C4 | 버티는 칸과 사라지는 칸이 어울려 부딪힌다 |
 
-랭턴의 개미, 와이어월드, 1차원 규칙(규칙 30)은 규칙 파일만 먼저 만들어 두었고 다음 단계에서 돌립니다.
+랭턴의 개미·터마이트, 1차원 규칙(규칙 30·90·110), 와이어월드는 계산을 먼저 넣어 두었고, 화면이 붙는 대로 도감에 올라옵니다.
 
 ## 화면
 
@@ -76,7 +76,7 @@
 ```
 
 - `states`: 순서가 곧 상태 번호입니다. `color`(#rrggbb)를 넣으면 그 색으로, 빼면 화면 색으로 그립니다. 3개 이상이면 Generations 규칙이 됩니다.
-- `grid`: `edges`가 `infinite`면 끝없는 격자입니다(빼도 같습니다). Life 계열은 끝없는 격자에서만 돌립니다. `wrap`(이어 붙이기)·`wall`(벽)과 `width`·`height`는 다음 단계의 규칙(랭턴의 개미, 와이어월드)을 위한 자리입니다.
+- `grid`: `edges`가 `infinite`면 끝없는 격자입니다(빼도 같습니다). 모든 계열이 끝없는 격자에서 돕니다. `wrap`(이어 붙이기)·`wall`(벽)과 `width`·`height`는 나중을 위한 자리입니다.
 - `rule.birth`에는 0을 넣을 수 없습니다.
 - `seed`: `empty`, `random`(`density`, 가운데만 채우려면 `area`), `single`(가운데 한 칸), `rle`(`data`에 RLE 무늬). 무작위로 뿌릴 때는 화면에 보이는 넓이를 기준으로 합니다.
 
@@ -97,17 +97,18 @@ web/                          웹 앱 (GitHub Pages)
   index.html, style.css
   icons/                      파비콘
   data/rules/                 규칙 파일. index.json 이 도감에 내놓는 목록이다
-  data/patterns/              기본 무늬(RLE) 자리
+  data/patterns/              무늬 모음(RLE 파일). index.json 이 목록이다
   js/app.js                   화면 이동(#/, #/r/<id>, #/make, #/about)과 밝기
-  js/core/                    계산: 끝없는 격자(plane), Life 계열 규칙(life), 작은 격자(grid), RLE, 난수(rng),
-                              규칙 파일 검사(rules), 조사(josa)
+  js/core/                    계산: 엔진과 화면 사이의 꼴(sim), 끝없는 격자(plane), Life 계열 규칙(life),
+                              개미·터마이트(ant), 1차원(elementary), 조건표(table), 작은 격자(grid), RLE,
+                              난수(rng), 규칙 파일 검사(rules), 조사(josa)
   js/data/                    도감 글(catalog), 규칙 파일 불러오기(presets)
   js/ui/                      화면 조각: 점 격자와 보는 곳(board), 끌기·누르기·확대(nav), 세대와 기록(world),
                               돌리기(loop), 선 잇기(pen), 규칙 점 단추(rulepad), 재생 막대·확대 단추(widgets),
                               작은 그래프(spark), 도감 그림(thumb), 무늬 그림(art), 밝기(theme)
   js/views/                   화면: 첫 화면(home), 규칙·만들기(rule), 소개(about)
   js/i18n.js, js/i18n/        화면 글. 영어판은 i18n/en.js 를 채우면 된다
-tests/                        node --test (끝없는 격자, 엔진, 작은 격자·RLE, 규칙 파일, 화면 글)
+tests/                        node --test (sim, 끝없는 격자, Life·개미·1차원·조건표, 작은 격자, RLE, 규칙 파일, 화면 글)
 scripts/stamp.py              배포할 때 스크립트·스타일 주소에 판(?v=)을 붙인다
 docs/screenshots/             이 README 의 화면 캡처
 .github/workflows/pages.yml   테스트하고 GitHub Pages 로 올린다
