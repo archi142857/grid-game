@@ -1,6 +1,7 @@
 // 끝없는 격자. 판을 32×32 조각으로 나누고, 칸이 있는 조각만 Map 에 둔다.
 // 한 세대를 넘길 때는 조각마다 둘레 한 줄을 이웃 조각에서 빌려 와(34×34) 표만 찾는다(core/life.js 의 표와 같다).
-// 가장자리에 산 칸이 닿은 조각은 그쪽 이웃 조각을 미리 만들어 두어, 무늬가 어디로든 자라 나갈 수 있게 한다.
+// 세는 이웃은 기본으로 산 칸(상태 1)이다. 조건표처럼 다른 상태를 셀 때는 상태마다 무게(weights)를 주고, 표는 무게를 더한 수로 찾는다.
+// 가장자리에 세는 칸이 닿은 조각은 그쪽 이웃 조각을 미리 만들어 두어, 무늬가 어디로든 자라 나갈 수 있게 한다.
 // 비어 있는 조각은 한 세대 더 두었다가(사라지는 모습을 그릴 수 있게) 지운다.
 
 export const TILE = 32;
@@ -15,6 +16,7 @@ const LIMIT = 30000; // 조각 좌표의 끝(가운데에서 약 96만 칸). 그
 export const REACH = LIMIT * TILE;
 
 const keyOf = (tx, ty) => tx * 65536 + ty;
+const isLive = (v) => (v === 1 ? 1 : 0);
 
 // 가장자리 표시: 그 줄에 산 칸이 있으면 그쪽 이웃 조각이 있어야 한다
 const EDGE_N = 1;
@@ -36,7 +38,8 @@ const DIRS = [
   [EDGE_SE, 1, 1],
 ];
 
-function edgeOf(c) {
+/** 산 칸(1)만 볼 때의 가장자리 표시(Life 가 쓰는 빠른 길) */
+function edgeLive(c) {
   let e = 0;
   for (let i = 0; i < S; i++) {
     if (c[i] === 1) e |= EDGE_N;
@@ -48,6 +51,24 @@ function edgeOf(c) {
   if (c[MASK] === 1) e |= EDGE_NE;
   if (c[N - S] === 1) e |= EDGE_SW;
   if (c[N - 1] === 1) e |= EDGE_SE;
+  return e;
+}
+
+/** 가장자리 표시. w 가 없으면 산 칸(1)을, 있으면 무게가 0 이 아닌 상태를 본다 */
+function edgeOf(c, w = null) {
+  if (!w) return edgeLive(c);
+  const on = (v) => w[v] !== 0;
+  let e = 0;
+  for (let i = 0; i < S; i++) {
+    if (on(c[i])) e |= EDGE_N;
+    if (on(c[N - S + i])) e |= EDGE_S;
+    if (on(c[i * S])) e |= EDGE_W;
+    if (on(c[i * S + MASK])) e |= EDGE_E;
+  }
+  if (on(c[0])) e |= EDGE_NW;
+  if (on(c[MASK])) e |= EDGE_NE;
+  if (on(c[N - S])) e |= EDGE_SW;
+  if (on(c[N - 1])) e |= EDGE_SE;
   return e;
 }
 
@@ -116,11 +137,11 @@ export function makePlane() {
     return old;
   }
 
-  /** 가장자리에 산 칸이 닿은 조각 둘레에 빈 조각을 만들어 둔다 */
-  function expand() {
+  /** 가장자리에 세는 칸이 닿은 조각 둘레에 빈 조각을 만들어 둔다 */
+  function expand(w) {
     for (const t of tiles.values()) {
       if (t.dirty) {
-        t.edge = edgeOf(t.cells);
+        t.edge = edgeOf(t.cells, w);
         t.dirty = false;
       }
       if (!t.edge) continue;
@@ -128,14 +149,20 @@ export function makePlane() {
     }
   }
 
-  /** 조각과 둘레 한 줄의 '산 칸인가'를 34×34 판에 옮긴다 */
-  function fillPad(t) {
+  /** 조각과 둘레 한 줄의 무게(기본은 '산 칸인가')를 34×34 판에 옮긴다. val 은 둘레 칸의 무게 */
+  function fillPad(t, w, val) {
     const c = t.cells;
     for (let y = 0; y < S; y++) {
       const o = (y + 1) * P + 1;
       const r = y * S;
-      for (let x = 0; x < S; x++) pad[o + x] = c[r + x] === 1 ? 1 : 0;
+      if (w) for (let x = 0; x < S; x++) pad[o + x] = w[c[r + x]];
+      else for (let x = 0; x < S; x++) pad[o + x] = c[r + x] === 1 ? 1 : 0;
     }
+    fillRim(t, val);
+  }
+
+  /** 둘레 한 줄을 이웃 조각에서 빌려 온다 */
+  function fillRim(t, val) {
     const { tx, ty } = t;
     const n = tiles.get(keyOf(tx, ty - 1));
     const s = tiles.get(keyOf(tx, ty + 1));
@@ -147,30 +174,33 @@ export function makePlane() {
     const se = tiles.get(keyOf(tx + 1, ty + 1));
     const bottom = (S + 1) * P;
     for (let x = 0; x < S; x++) {
-      pad[x + 1] = n && n.cells[N - S + x] === 1 ? 1 : 0;
-      pad[bottom + x + 1] = s && s.cells[x] === 1 ? 1 : 0;
+      pad[x + 1] = n ? val(n.cells[N - S + x]) : 0;
+      pad[bottom + x + 1] = s ? val(s.cells[x]) : 0;
     }
     for (let y = 0; y < S; y++) {
       const o = (y + 1) * P;
-      pad[o] = w && w.cells[y * S + MASK] === 1 ? 1 : 0;
-      pad[o + S + 1] = e && e.cells[y * S] === 1 ? 1 : 0;
+      pad[o] = w ? val(w.cells[y * S + MASK]) : 0;
+      pad[o + S + 1] = e ? val(e.cells[y * S]) : 0;
     }
-    pad[0] = nw && nw.cells[N - 1] === 1 ? 1 : 0;
-    pad[S + 1] = ne && ne.cells[N - S] === 1 ? 1 : 0;
-    pad[bottom] = sw && sw.cells[MASK] === 1 ? 1 : 0;
-    pad[bottom + S + 1] = se && se.cells[0] === 1 ? 1 : 0;
+    pad[0] = nw ? val(nw.cells[N - 1]) : 0;
+    pad[S + 1] = ne ? val(ne.cells[N - S]) : 0;
+    pad[bottom] = sw ? val(sw.cells[MASK]) : 0;
+    pad[bottom + S + 1] = se ? val(se.cells[0]) : 0;
   }
 
   /**
-   * 한 세대를 넘긴다. table 은 core/life.js 의 makeTable 이 만든 표.
-   * 태어남에 0 이 있으면(빈 곳이 저절로 태어나면) 끝없는 격자에서는 돌릴 수 없어 null 을 돌려준다.
+   * 한 세대를 넘긴다. table 은 core/life.js 의 makeTable 이 만든 표(지금 상태 * stride + 이웃 수).
+   * weights 를 주면 이웃 수 대신 이웃 무게의 합으로 찾는다(core/table.js). 산 칸(1)만 세면 null.
+   * 빈칸이 이웃 없이도 바뀌면(태어남 0 처럼) 끝없는 격자에서는 돌릴 수 없어 null 을 돌려준다.
    */
-  function step(table) {
+  function step(table, weights = null, stride = 9) {
     if (table[0] !== 0) return null;
-    expand();
+    const w = weights;
+    const val = w ? (v) => w[v] : isLive;
+    expand(w);
     let changed = 0;
     for (const t of tiles.values()) {
-      fillPad(t);
+      fillPad(t, w, val);
       const src = t.cells;
       const dst = t.next;
       let pop = 0;
@@ -184,7 +214,7 @@ export function makePlane() {
           const n =
             pad[r0 + x] + pad[r0 + x + 1] + pad[r0 + x + 2] + pad[r1 + x] + pad[r1 + x + 2] + pad[r2 + x] + pad[r2 + x + 1] + pad[r2 + x + 2];
           const now = src[i];
-          const nx = table[now * 9 + n];
+          const nx = table[now * stride + n];
           dst[i] = nx;
           if (nx !== 0) {
             pop++;
@@ -206,7 +236,7 @@ export function makePlane() {
       t.prevPop = t.pop;
       t.pop = t.nPop;
       t.live = t.nLive;
-      t.edge = t.live ? edgeOf(t.cells) : 0;
+      t.edge = (w ? t.pop : t.live) ? edgeOf(t.cells, w) : 0;
       t.dirty = false;
       total += t.live;
       all += t.pop;
@@ -259,6 +289,11 @@ export function makePlane() {
     tiles.clear();
     alive = 0;
     filled = 0;
+  }
+
+  /** 세는 상태가 바뀌었을 때: 다음 세대에 가장자리를 모두 다시 센다 */
+  function markDirty() {
+    for (const t of tiles.values()) t.dirty = true;
   }
 
   /** 칸이 하나도 없는 조각을 치운다(step 을 쓰지 않는 계열이 부른다) */
@@ -374,6 +409,7 @@ export function makePlane() {
     bounds,
     clear,
     prune,
+    markDirty,
     rowSpan,
     readRow,
     dropAbove,

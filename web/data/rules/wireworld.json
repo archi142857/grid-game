@@ -1,22 +1,11 @@
 {
   "id": "wireworld",
   "name": "와이어월드",
-  "description": "도선 위로 전자가 흐른다. 전자 머리는 꼬리가 되고, 꼬리는 도선으로 돌아가며, 도선은 이웃한 전자 머리가 1~2개일 때 머리가 된다. 이것만으로 논리 회로를 만들 수 있다.",
+  "description": "도선 위로 전자가 흘러요. 전자 머리는 꼬리가 되고, 꼬리는 도선으로 돌아가며, 도선은 이웃한 전자 머리가 1~2개일 때 머리가 돼요. 이것만으로 논리 회로를 만들 수 있어요.",
   "family": "table",
-  "grid": { "width": 120, "height": 80, "edges": "wall" },
+  "grid": { "edges": "infinite" },
   "neighborhood": "moore",
-  "states": [
-    { "name": "빈칸", "color": "#111418" },
-    { "name": "전자 머리", "color": "#4aa3ff" },
-    { "name": "전자 꼬리", "color": "#ff6b4a" },
-    { "name": "도선", "color": "#f2c14a" }
-  ],
-  "rule": {
-    "transitions": [
-      { "from": 1, "to": 2 },
-      { "from": 2, "to": 3 },
-      { "from": 3, "to": 1, "when": { "state": 1, "count": [1, 2] } }
-    ]
-  },
-  "seed": { "type": "rle", "data": ".BAC$C3.7C$.3C!" }
+  "states": [{ "name": "빈칸" }, { "name": "전자 머리" }, { "name": "전자 꼬리" }, { "name": "도선" }],
+  "rule": { "transitions": [{ "from": 1, "to": 2 }, { "from": 2, "to": 3 }, { "from": 3, "to": 1, "when": { "state": 1, "count": [1, 2] } }] },
+  "seed": { "type": "rle", "data": ".BAC$C3.25C$.3C!" }
 }

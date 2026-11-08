@@ -7,11 +7,13 @@ import { makePlane, REACH } from "./plane.js";
 import { makeTable, explain as lifeExplain } from "./life.js";
 import { compileAnt, stepAnts, MAX_AGENTS, TURN_LETTERS, DIR_LETTERS } from "./ant.js";
 import { stepRow, rowsKept, isLockedNumber, patternOf, nextOf, MAX_WIDTH } from "./elementary.js";
+import { compileTable, matchRow } from "./table.js";
 import { parseRLE } from "./rle.js";
 import { lifeRule } from "./rules.js";
 
 export { MAX_ANT_COLORS, MAX_ANT_STATES, MAX_AGENTS } from "./ant.js";
 export { ROWS_MIN, ROWS_MAX, MAX_WIDTH, rowsKept } from "./elementary.js";
+export { MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED } from "./table.js";
 
 /** 쓰는 조각(32×32)이 이만큼을 넘으면(약 100만 칸) 너무 넓게 퍼진 것으로 보고 멈춘다 */
 export const MAX_TILES = 1024;
@@ -30,7 +32,7 @@ export const around = (x, y) => [
   [x + 1, y + 1],
 ];
 
-const BUILD = { life: lifeSim, ant: antSim, elementary: elementarySim };
+const BUILD = { life: lifeSim, ant: antSim, elementary: elementarySim, table: tableSim };
 
 /** 이 엔진이 sim 으로 돌릴 수 있는 계열 */
 export const SIM_FAMILIES = Object.keys(BUILD);
@@ -63,23 +65,74 @@ function putRows(P, rows, cx, cy, states) {
 
 const regionCenter = (region) => [region.x + region.w / 2, region.y + region.h / 2];
 
-// ── Life 계열 ─────────────────
+// ── Life 계열과 조건표 ─────────────────
+// 둘 다 (지금 상태, 이웃) → 다음 상태 표를 plane.step 으로 돌린다. 앞 세대가 남아 사이를 잇는다.
 
 function lifeSim(rule) {
+  return cellSim(rule, {
+    family: "life",
+    compile: (r) => ({ table: makeTable(lifeRule(r)), weights: null, stride: 9 }),
+    /** 흩뿌리기·random 뿌리기는 산 칸(1)으로 */
+    pick: null,
+    /**
+     * 살펴보기: 칸 하나가 다음 세대에 어떻게 되는지.
+     * { now, next, why, n(산 이웃 수), cells(이웃 8칸 자리) }. why 는 core/life.js 의 explain 과 같다
+     *   born · stay · survive · die · fade · fading · gone
+     */
+    explain(P, r, x, y) {
+      const cells = around(x, y);
+      let n = 0;
+      for (const [a, b] of cells) if (P.get(a, b) === 1) n++;
+      const now = P.get(x, y);
+      const e = lifeExplain(lifeRule(r), now, n);
+      return { now, next: e.next, why: e.why, n, cells };
+    },
+  });
+}
+
+function tableSim(rule) {
+  return cellSim(rule, {
+    family: "table",
+    compile: (r) => compileTable(r.transitions, r.states.length),
+    /** 흩뿌리기·random 뿌리기는 빈칸이 아닌 상태 가운데 무작위로 */
+    pick: (rng, states) => () => 1 + rng.int(states - 1),
+    /**
+     * 살펴보기: { now, next, why, row, counts, n, cells }
+     *   why: row(row 번째 줄이 맞음) · stay(맞는 줄이 없어 그대로)
+     *   counts: 세는 상태마다 이웃 수 { 상태: 수 }, n: 첫째 세는 상태의 이웃 수, cells: 이웃 8칸 자리
+     */
+    explain(P, r, x, y, prog) {
+      const cells = around(x, y);
+      const list = prog.counted.map(() => 0);
+      for (const [a, b] of cells) {
+        const k = prog.counted.indexOf(P.get(a, b));
+        if (k >= 0) list[k]++;
+      }
+      const now = P.get(x, y);
+      const row = matchRow(r.transitions, prog.counted, now, list);
+      const counts = Object.fromEntries(prog.counted.map((s, k) => [s, list[k]]));
+      return { now, next: row < 0 ? now : r.transitions[row].to, why: row < 0 ? "stay" : "row", row, counts, n: list[0] ?? 0, cells };
+    },
+  });
+}
+
+/** 표로 돌리는 계열(Life·조건표)이 함께 쓰는 sim */
+function cellSim(rule, kind) {
   const P = makePlane();
   let r = rule;
-  let table = makeTable(lifeRule(r));
+  let prog = kind.compile(r);
   let prevOk = false; // 조각마다 바로 앞 세대가 남아 있는가
 
   const states = () => r.states.length;
+  const pick = (rng) => (kind.pick ? kind.pick(rng, states()) : null);
 
   const sim = {
-    family: "life",
+    family: kind.family,
     get rule() {
       return r;
     },
-    /** 태어남에 0 이 있으면 빈 곳 전체가 한꺼번에 태어나서 끝없는 격자에서는 돌릴 수 없다 */
-    canRun: () => table[0] === 0,
+    /** 이웃이 없는 빈칸이 바뀌면(Life 의 태어남 0 처럼) 빈 곳 전체가 한꺼번에 바뀌어서 끝없는 격자에서는 돌릴 수 없다 */
+    canRun: () => prog.table[0] === 0,
     get full() {
       return P.size > MAX_TILES;
     },
@@ -90,7 +143,7 @@ function lifeSim(rule) {
       let changed = 0;
       let k = 0;
       while (k < n) {
-        const res = P.step(table);
+        const res = P.step(prog.table, prog.weights, prog.stride);
         if (!res) break;
         changed += res.changed;
         k++;
@@ -118,7 +171,7 @@ function lifeSim(rule) {
 
     agents: NONE,
     head: null,
-    /** 산 칸(상태 1) 수 */
+    /** 상태 1 인 칸 수(Life 는 산 칸, 와이어월드는 전자 머리) */
     get alive() {
       return P.alive;
     },
@@ -127,7 +180,7 @@ function lifeSim(rule) {
       return P.size;
     },
 
-    snapshot: () => ({ family: "life", states: states(), cells: P.snapshot() }),
+    snapshot: () => ({ family: kind.family, states: states(), cells: P.snapshot() }),
     /** 떠 둔 모습으로. 그사이 상태 수가 줄었으면 없어진 상태의 칸은 빈칸이 된다 */
     restore(snap) {
       P.restore(snap.cells);
@@ -137,11 +190,12 @@ function lifeSim(rule) {
 
     /** 같은 계열 안에서 규칙만 바꾼다(칸은 그대로). 상태 수가 줄면 없어진 상태의 칸은 빈칸이 된다 */
     setRule(next) {
-      if (next.family !== "life") throw new Error(`setRule: 계열이 달라요 (life → ${next.family}). 새 sim 을 만들어 주세요`);
+      if (next.family !== kind.family) throw new Error(`setRule: 계열이 달라요 (${kind.family} → ${next.family}). 새 sim 을 만들어 주세요`);
       const fewer = next.states.length < r.states.length;
       r = next;
-      table = makeTable(lifeRule(r));
+      prog = kind.compile(r);
       if (fewer) P.clampStates(states());
+      P.markDirty(); // 세는 상태가 바뀌었을 수 있으니 가장자리를 다시 센다
     },
 
     clear() {
@@ -153,7 +207,7 @@ function lifeSim(rule) {
     seed(region, rng) {
       sim.clear();
       const s = r.seed ?? { type: "empty" };
-      if (s.type === "random") fillRegion(P, region, s.density ?? 0.3, s.area ?? 1, rng);
+      if (s.type === "random") fillRegion(P, region, s.density ?? 0.3, s.area ?? 1, rng, pick(rng));
       else if (s.type === "single") P.set(region.x + (region.w >> 1), region.y + (region.h >> 1), 1);
       else if (s.type === "rle") putRows(P, parseRLE(s.data).rows, ...regionCenter(region), states());
     },
@@ -162,7 +216,7 @@ function lifeSim(rule) {
     scatter(region, density, rng) {
       sim.clear();
       const s = r.seed;
-      fillRegion(P, region, density, s && s.type === "random" ? (s.area ?? 1) : 1, rng);
+      fillRegion(P, region, density, s && s.type === "random" ? (s.area ?? 1) : 1, rng, pick(rng));
     },
 
     /** 비우고 무늬(RLE 의 rows)를 (cx, cy) 가운데에 놓는다 */
@@ -171,25 +225,13 @@ function lifeSim(rule) {
       putRows(P, rows, cx, cy, states());
     },
 
-    /** region 안의 산 칸과 빈칸을 뒤바꾼다(사라지는 중인 칸은 빈칸으로 본다) */
+    /** region 안의 상태 1 칸과 빈칸을 뒤바꾼다(다른 상태는 빈칸으로 본다) */
     invert(region) {
       for (let y = region.y; y < region.y + region.h; y++) for (let x = region.x; x < region.x + region.w; x++) P.set(x, y, P.get(x, y) === 1 ? 0 : 1);
       prevOk = false;
     },
 
-    /**
-     * 살펴보기: 칸 하나가 다음 세대에 어떻게 되는지.
-     * { now, next, why, n(산 이웃 수), cells(이웃 8칸 자리) }. why 는 core/life.js 의 explain 과 같다
-     *   born · stay · survive · die · fade · fading · gone
-     */
-    explain(x, y) {
-      const cells = around(x, y);
-      let n = 0;
-      for (const [a, b] of cells) if (P.get(a, b) === 1) n++;
-      const now = P.get(x, y);
-      const e = lifeExplain(lifeRule(r), now, n);
-      return { now, next: e.next, why: e.why, n, cells };
-    },
+    explain: (x, y) => kind.explain(P, r, x, y, prog),
   };
   return sim;
 }
