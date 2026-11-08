@@ -6,6 +6,16 @@
 // 빈칸(0)은 셀 수 없다: 끝없는 격자의 빈 곳은 칸이 없는 조각이라 셀 수가 없다.
 // 이웃이 하나도 없는 빈칸이 바뀌는 규칙은 빈 곳이 한꺼번에 바뀌어서 돌릴 수 없다(잠근다).
 
+/** 와이어월드의 줄(상태: 0 빈칸 · 1 전자 머리 · 2 전자 꼬리 · 3 도선). RLE 머리 줄의 rule = WireWorld 가 이것 */
+export const WIREWORLD = Object.freeze([
+  Object.freeze({ from: 1, to: 2 }),
+  Object.freeze({ from: 2, to: 3 }),
+  Object.freeze({ from: 3, to: 1, when: Object.freeze({ state: 1, count: Object.freeze([1, 2]) }) }),
+]);
+
+/** 와이어월드와 같은 규칙인가(상태 4개, 줄이 같다) */
+export const isWireworld = (r) => r.family === "table" && r.states.length === 4 && JSON.stringify(r.transitions) === JSON.stringify(WIREWORLD);
+
 /** 상태 수의 끝 */
 export const MAX_TABLE_STATES = 16;
 /** 줄 수의 끝 */

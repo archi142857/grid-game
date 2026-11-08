@@ -7,7 +7,7 @@ import { t } from "../i18n.js";
 import { MIN_STATES, MAX_STATES, parseNotation, formatNotation } from "./life.js";
 import { MAX_ANT_COLORS, MAX_AGENTS, DIR_LETTERS, parseTurns, antRuleProblem } from "./ant.js";
 import { parseWolfram, formatWolfram, isLockedNumber } from "./elementary.js";
-import { MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED, tableProblem, compileTable } from "./table.js";
+import { MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED, tableProblem, compileTable, WIREWORLD, isWireworld } from "./table.js";
 
 /** 엔진이 아는 계열 */
 export const FAMILIES = ["life", "ant", "elementary", "table"];
@@ -207,6 +207,27 @@ export function lockOf(r) {
   if (r.family === "elementary" && isLockedNumber(r.number)) return "odd";
   if (r.family === "table" && compileTable(r.transitions, r.states.length).table[0] !== 0) return "empty";
   return null;
+}
+
+/** RLE 머리 줄의 rule. Life 계열은 B3/S23 꼴, 와이어월드는 WireWorld. RLE 로 나눌 수 없는 규칙은 null */
+export function rleRuleOf(r) {
+  if (r.family === "life") return formatNotation(lifeRule(r));
+  if (isWireworld(r)) return "WireWorld";
+  return null;
+}
+
+/**
+ * RLE 머리 줄의 rule 글을 읽는다. 못 읽으면 null. Golly 가 붙이는 판 크기(:T100,100 같은 것)는 버린다
+ *   B3/S23 · 23/3 · B2/S/C3 → { family: "life", birth, survive, states }
+ *   WireWorld → { family: "table", id: "wireworld", states: 4, transitions }
+ */
+export function parseRleRule(text) {
+  const s = String(text ?? "")
+    .split(":")[0]
+    .trim();
+  if (/^wireworld$/i.test(s)) return { family: "table", id: "wireworld", states: 4, transitions: clone(WIREWORLD) };
+  const life = parseNotation(s);
+  return life ? { family: "life", ...life } : null;
 }
 
 /** 규칙 파일 글. 맨 위 항목마다 한 줄, 그 안은 한 줄로 적는다(프리셋 파일과 같은 꼴) */

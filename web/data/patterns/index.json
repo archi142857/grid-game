@@ -1,0 +1,15 @@
+[
+  { "id": "glider", "rule": "B3/S23" },
+  { "id": "lwss", "rule": "B3/S23" },
+  { "id": "pulsar", "rule": "B3/S23" },
+  { "id": "pentadecathlon", "rule": "B3/S23" },
+  { "id": "gosper-glider-gun", "rule": "B3/S23" },
+  { "id": "r-pentomino", "rule": "B3/S23" },
+  { "id": "acorn", "rule": "B3/S23" },
+  { "id": "diehard", "rule": "B3/S23" },
+  { "id": "replicator", "rule": "B36/S23" },
+  { "id": "bomber", "rule": "B36/S23" },
+  { "id": "seeds-square", "rule": "B2/S" },
+  { "id": "brians-brain-square", "rule": "B2/S/C3" },
+  { "id": "wireworld-clock", "rule": "WireWorld" }
+]
