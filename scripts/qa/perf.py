@@ -135,7 +135,7 @@ with sync_playwright() as pw:
         ctx.close()
     b.close()
 
-with open(f"{a.out}/perf.json", "w", encoding="utf-8") as f:
+with open(f"{a.out}/perf_results.json", "w", encoding="utf-8") as f:  # perf.json 은 Checks 가 쓴다
     json.dump(results, f, ensure_ascii=False, indent=1)
 print("\n| 기기 | 칸 | 산 칸 | 끌기: 가운데·90%·최대 ms (16ms 넘는 몫) | 돌기: 가운데·90%·최대 ms (16ms 넘는 몫), 장/초, 세대/초 |")
 print("|---|---|---|---|---|")
