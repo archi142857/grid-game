@@ -307,13 +307,13 @@ export const EN = {
   "속이 꽉 찬 삼각형을 키우며 옮겨 가요.": "It grows a solid triangle that travels as it grows.",
   "대칭 개미": "Symmetric ant",
   "그렉 터크·짐 프롭": "Greg Turk & Jim Propp",
-  "이리저리 헤매는데도 그림은 늘 거울에 비춘 듯 대칭이에요.": "It wanders every which way, yet its drawing is always mirror-symmetric.",
+  "이리저리 헤매는데도 그림이 몇 번이고 거울에 비춘 듯 대칭이 돼요.": "It wanders every which way, yet its drawing becomes mirror-symmetric again and again.",
   "그렉 터크와 짐 프롭은 랭턴의 개미에 색을 더 늘려 보았어요. 이름의 글자가 색마다 돌 쪽을 정해요(L 왼쪽, R 오른쪽). 이 이름법으로 랭턴의 개미는 RL 이고, 이 개미는 색이 넷인 LLRR 이에요.":
     "Greg Turk and Jim Propp tried giving Langton's ant more colors. Each letter of the name sets which way to turn on each color (L left, R right). In this naming, Langton's ant is RL, and this one is the four-color LLRR.",
-  "LL, RR 처럼 같은 글자가 둘씩 짝지어 있는 개미는 그림이 늘 대칭으로 자란다는 것이 증명되어 있어요. 개미가 어지럽게 움직이는 동안에도 대칭이 깨지지 않는지 지켜보세요.":
-    "It has been proved that when a name is made of matching pairs of letters, like LL and RR, the drawing always grows symmetrically. Watch whether the symmetry ever breaks while the ant wanders about.",
+  "LL, RR 처럼 같은 글자가 둘씩 짝지어 있는 개미는 그림이 몇 번이고 다시 대칭이 된다는 것이 증명되어 있어요. 개미가 처음 자리로 돌아올 즈음 멈춰 보면, 그림이 거울에 비춘 듯 맞아떨어질 때가 많아요.":
+    "It has been proved that when a name is made of matching pairs of letters, like LL and RR, the drawing becomes symmetric over and over again. Pause when the ant comes back near where it started, and the drawing often lines up like a mirror image.",
   "짝 늘리기": "More pairs",
-  "같은 글자 짝을 더 늘린 LLRRRRLL 도 대칭으로 자라요.": "LLRRRRLL, with more pairs, grows symmetrically too.",
+  "같은 글자 짝을 더 늘린 LLRRRRLL 도 거듭 대칭이 돼요.": "LLRRRRLL, with more pairs, keeps becoming symmetric too.",
   "짝 깨뜨리기": "Break the pairs",
   "짝이 맞지 않는 RLR 은 대칭을 잃고 어지럽게 자라요.": "RLR, whose letters don't pair up, loses the symmetry and grows chaotically.",
   "네모 개미": "Square ant",
