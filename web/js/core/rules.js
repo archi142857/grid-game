@@ -14,8 +14,8 @@ import { MIN_CODE_STATES, MAX_CODE_STATES, MAX_SOURCE, codeLocked } from "./code
 
 /** 엔진이 아는 계열 */
 export const FAMILIES = ["life", "ant", "elementary", "table", "cyclic", "code"];
-/** 화면이 붙은 계열. checkRuleFile 은 따로 말하지 않으면 이것만 받는다(화면이 되면 프론트엔드 쪽지를 받고 넣는다) */
-export const READY_FAMILIES = ["life"];
+/** 화면이 붙은 계열. checkRuleFile 은 따로 말하지 않으면 이것만 받는다(화면이 되면 프론트엔드 쪽지를 받고 넣는다. ant 는 e78dd5e) */
+export const READY_FAMILIES = ["life", "ant"];
 export const SEED_TYPES = ["empty", "random", "single", "rle"];
 export const EDGES = ["infinite", "wrap", "wall"];
 
