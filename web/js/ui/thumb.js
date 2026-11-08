@@ -44,7 +44,7 @@ export function makeThumb(rule, { w = 26, h: hh = 26, gens = 30, key = rule.id, 
     rate: () => rate,
   });
   const recolor = () => {
-    board.setColors(boardColors(rule.states), rule.states.length);
+    board.setColors(boardColors(rule.states, rule.family));
     draw(1);
   };
   recolor();

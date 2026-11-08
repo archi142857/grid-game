@@ -501,7 +501,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   }
 
   function recolor() {
-    board.setColors(boardColors(rule.states), rule.states.length);
+    board.setColors(boardColors(rule.states, rule.family));
     paint();
   }
 

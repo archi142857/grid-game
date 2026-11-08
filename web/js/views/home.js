@@ -115,7 +115,7 @@ function makeHero(presets) {
   }
 
   function recolor() {
-    board.setColors(boardColors(rule.states), rule.states.length);
+    board.setColors(boardColors(rule.states, rule.family));
     paint();
   }
 

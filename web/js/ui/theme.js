@@ -45,17 +45,34 @@ export function hexToRgb(hex) {
 export const mixRgb = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
 
 /**
- * 판을 그릴 색. 빈칸 점(empty), 산 칸(ink), 방금 태어난 칸(signal), 사라지는 중인 칸(dying[k]).
- * 사라지는 칸은 잉크에서 빈칸 점 색으로 점점 흐려진다. 규칙 파일에 상태 색(color)이 있으면 그 색이 먼저다.
+ * 판을 그릴 색과 모양. 바탕(bg), 빈칸 점(empty), 커서·이웃 고리(ring), 신호색(signal),
+ * 개미 표시(agent), 1차원의 새 줄(head), 그리고 상태마다 점 모양 shape[s] (s ≥ 1):
+ *   r      점 반지름(칸 한 변에 대한 몫, 0–0.5). 0 이면 안 그린다
+ *   color  그 상태에 머무는 칸의 색 [r, g, b] 또는 [r, g, b, a]
+ *   enter  다른 상태에서 막 들어온 칸의 색(없으면 color). Life 의 방금 태어난 칸이 신호색
+ *   exit   이 상태에서 빈칸으로 줄어들며 사라지는 칸의 색(없으면 color)
+ * Life 는 산 칸이 잉크, 사라지는 칸(상태 2 이상)은 잉크에서 빈칸 점 색으로 흐려지며 작아진다.
+ * 다른 계열의 모양은 디자인이 정하기 전까지 임시다(상태마다 잉크를 단계로 옅게).
+ * 규칙 파일에 상태 색(color)이 있으면 그 색이 먼저다.
  */
-export function boardColors(states) {
+export function boardColors(states, family = "life") {
   const C = states.length;
   const bg = hexToRgb(cssVar("--board"));
   const empty = hexToRgb(cssVar("--dot-0"));
   const ink = hexToRgb(cssVar("--ink"));
   const signal = hexToRgb(cssVar("--signal"));
-  const dying = [];
-  for (let k = 2; k < C; k++) dying[k] = mixRgb(ink, empty, 0.38 + (0.42 * (k - 2)) / Math.max(1, C - 2));
   const own = (i, c) => (states[i]?.color ? hexToRgb(states[i].color) : c);
-  return { bg, empty, ink: own(1, ink), signal, dying: dying.map((c, k) => (c ? own(k, c) : c)), ring: hexToRgb(cssVar("--ink-4")) };
+  const shape = [null];
+  if (family === "life") {
+    const live = own(1, ink);
+    shape[1] = { r: 0.4, color: live, enter: signal, exit: [...live, 0.45] };
+    for (let k = 2; k < C; k++) {
+      const f = (k - 2) / Math.max(1, C - 2);
+      shape[k] = { r: 0.4 * (0.74 - 0.44 * f), color: own(k, mixRgb(ink, empty, 0.38 + 0.42 * f)) };
+    }
+  } else {
+    // 임시: 상태 1 이 잉크, 번호가 클수록 옅게. 크기는 같다
+    for (let k = 1; k < C; k++) shape[k] = { r: 0.4, color: own(k, mixRgb(ink, empty, (0.55 * (k - 1)) / Math.max(1, C - 2))) };
+  }
+  return { bg, empty, ink: shape[1]?.color ?? ink, signal, agent: signal, head: signal, shape, ring: hexToRgb(cssVar("--ink-4")) };
 }
