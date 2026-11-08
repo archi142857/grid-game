@@ -218,6 +218,27 @@ export function parseCode(text) {
   return null;
 }
 
+/**
+ * parseCode 의 결과로 앱 규칙을 만든다(이름·설명·시작은 base 에서, 없으면 기본값). 못 만들면 null
+ *   Life → birth·survive(·neighborhood) · 1차원 → number · 개미 → turns(가운데에 위를 보는 개미 하나)
+ */
+export function ruleFromCode(code, base = {}) {
+  if (!code) return null;
+  const common = {
+    id: base.id ?? "custom",
+    name: base.name ?? t("이름 없는 규칙"),
+    description: base.description ?? "",
+    family: code.family,
+    grid: { edges: "infinite" },
+  };
+  const seed = base.seed ?? { type: "empty" };
+  if (code.family === "life")
+    return { ...common, neighborhood: code.neighborhood ?? "moore", states: resizeStates([], code.states, "life"), birth: [...code.birth], survive: [...code.survive], seed };
+  if (code.family === "elementary") return { ...common, states: resizeStates([], 2, "elementary"), number: code.number, seed };
+  if (code.family === "ant") return { ...common, states: resizeStates([], code.turns.length, "ant"), turns: code.turns, agents: [{ x: 0, y: 0, dir: "N" }], seed };
+  return null;
+}
+
 /** 규칙을 주소에 담을 표기로. 표기가 없는 규칙(터마이트 등)은 null */
 export function formatCode(r) {
   if (r.family === "life") return formatNotation(lifeRule(r));
