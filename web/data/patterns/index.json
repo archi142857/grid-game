@@ -11,5 +11,6 @@
   { "id": "bomber", "rule": "B36/S23" },
   { "id": "seeds-square", "rule": "B2/S" },
   { "id": "brians-brain-square", "rule": "B2/S/C3" },
-  { "id": "wireworld-clock", "rule": "WireWorld" }
+  { "id": "wireworld-clock", "rule": "WireWorld" },
+  { "id": "wireworld-diode", "rule": "WireWorld" }
 ]

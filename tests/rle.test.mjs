@@ -91,6 +91,16 @@ test("다른 규칙의 무늬도 이름대로 움직인다", () => {
   const at40 = shape(clock).key;
   clock.step(8);
   assert.equal(shape(clock).key, at40, "와이어월드 시계: 8세대 주기");
+  // 다이오드 둘(위는 정방향, 아래는 거꾸로)에 전자가 셋씩 들어간다. 지나간 뒤의 도선(x = 22)에 머리가 몇 번 오는지 센다
+  const diode = makeSim(ruleFor("WireWorld"));
+  parseRLE(text("wireworld-diode")).rows.forEach((row, y) => row.forEach((v, x) => v && diode.set(x, y, v)));
+  const passed = { forward: 0, backward: 0 };
+  for (let g = 0; g < 80; g++) {
+    diode.step();
+    if (diode.get(22, 1) === 1) passed.forward++;
+    if (diode.get(22, 5) === 1) passed.backward++;
+  }
+  assert.deepEqual(passed, { forward: 3, backward: 0 }, "와이어월드 다이오드: 한쪽으로만 지나간다");
   const seeds = placed("seeds-square");
   const brain = placed("brians-brain-square");
   assert.ok(popAt(seeds, [30])[0] > 30, "씨앗의 네 칸은 퍼진다");
