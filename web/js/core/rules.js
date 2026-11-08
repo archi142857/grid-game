@@ -29,7 +29,7 @@ const STATE_RANGE = {
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const uniqSorted = (xs) => [...new Set(xs)].sort((a, b) => a - b);
-const isCountList = (xs) => Array.isArray(xs) && xs.every((n) => Number.isInteger(n) && n >= 0 && n <= 8);
+const isCountList = (xs, max = 8) => Array.isArray(xs) && xs.every((n) => Number.isInteger(n) && n >= 0 && n <= max);
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
 /**
@@ -56,11 +56,13 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
   const rule = obj.rule ?? {};
   let neighborhood = null;
   if (family === "life") {
-    if (!isCountList(rule.birth)) errors.push(t("rule.birth: 0–8 사이 정수의 배열이어야 해요"));
-    else if (rule.birth.includes(0)) errors.push(t("rule.birth: 끝없는 격자에서는 0을 쓸 수 없어요"));
-    if (!isCountList(rule.survive)) errors.push(t("rule.survive: 0–8 사이 정수의 배열이어야 해요"));
     neighborhood = obj.neighborhood ?? "moore";
-    if (neighborhood !== "moore") errors.push(t("neighborhood: 지금은 moore 만 돼요"));
+    const hex = neighborhood === "hex";
+    if (neighborhood !== "moore" && !hex) errors.push(t("neighborhood: Life 계열은 moore 나 hex 예요"));
+    if (!isCountList(rule.birth, hex ? 6 : 8)) errors.push(hex ? t("rule.birth: 육각 이웃은 0–6 사이 정수의 배열이어야 해요") : t("rule.birth: 0–8 사이 정수의 배열이어야 해요"));
+    else if (rule.birth.includes(0)) errors.push(t("rule.birth: 끝없는 격자에서는 0을 쓸 수 없어요"));
+    if (!isCountList(rule.survive, hex ? 6 : 8))
+      errors.push(hex ? t("rule.survive: 육각 이웃은 0–6 사이 정수의 배열이어야 해요") : t("rule.survive: 0–8 사이 정수의 배열이어야 해요"));
   } else if (family === "ant") {
     if (statesOk) {
       const why = antRuleProblem(rule, states.length);
@@ -180,8 +182,11 @@ export function resizeStates(states, n, family = "life") {
   return out;
 }
 
-/** 엔진(core/life.js)에 넘길 꼴 */
-export const lifeRule = (r) => ({ birth: r.birth, survive: r.survive, states: r.states.length });
+/** 엔진(core/life.js)에 넘길 꼴. 육각 이웃이면 neighborhood: "hex" 가 붙는다(표기 끝의 H) */
+export const lifeRule = (r) =>
+  r.neighborhood === "hex"
+    ? { birth: r.birth, survive: r.survive, states: r.states.length, neighborhood: "hex" }
+    : { birth: r.birth, survive: r.survive, states: r.states.length };
 
 /** 움직임이 같은 규칙인가(이름·색·시작 상태·개미 자리는 보지 않는다) */
 export const sameRule = (a, b) =>

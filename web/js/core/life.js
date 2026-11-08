@@ -1,6 +1,7 @@
 // Life 계열 규칙(B/S/C). 칸 상태 0 은 빈칸, 1 은 산 칸, 2 부터 C-1 은 한 단계씩 사라지는 칸(Generations).
 // 다음 상태는 지금 상태와 '산 이웃 수'(무어 이웃 8칸 가운데 상태 1 인 칸)로만 정해진다.
 // 그래서 (상태, 이웃 수) → 다음 상태 표를 한 번 만들어 두고, 칸마다 표만 찾는다.
+// 육각 이웃(표기 끝에 H, Golly 꼴)은 무어 이웃에서 오른쪽 위와 왼쪽 아래를 뺀 6칸이고, 이웃 수는 0–6.
 
 export const MIN_STATES = 2;
 export const MAX_STATES = 255;
@@ -8,15 +9,28 @@ export const MAX_STATES = 255;
 const uniqSorted = (xs) => [...new Set(xs)].sort((a, b) => a - b);
 const digits = (s) => uniqSorted([...s].map(Number));
 
+/** 육각 이웃 6칸(Golly 꼴): 왼쪽 위·위·왼쪽·오른쪽·아래·오른쪽 아래 */
+export const hexNeighbors = (x, y) => [
+  [x - 1, y - 1],
+  [x, y - 1],
+  [x - 1, y],
+  [x + 1, y],
+  [x, y + 1],
+  [x + 1, y + 1],
+];
+
 /**
  * 표기를 읽는다. 못 읽으면 null.
  *   글자 꼴: B3/S23 · b3s23 · S23/B3 · B2/S/C3 · B2/S/3
  *   숫자 꼴(Golly·MCell 의 옛 꼴, 살아남음/태어남[/상태 수]): 23/3 · /2/3 · 345/2/4
+ *   끝에 H 가 붙으면 육각 이웃(B2/S34H). 그때 이웃 수는 0–6 이고 결과에 neighborhood: "hex" 가 붙는다
  */
 export function parseNotation(text) {
-  const s = String(text ?? "")
+  let s = String(text ?? "")
     .replace(/\s+/g, "")
     .toUpperCase();
+  const hex = s.endsWith("H");
+  if (hex) s = s.slice(0, -1);
   if (!s) return null;
   let b, sv, c;
   let m = s.match(/^(?:B([0-8]*)\/?S([0-8]*)|S([0-8]*)\/?B([0-8]*))(?:\/?[CG](\d+)|\/(\d+))?$/);
@@ -31,13 +45,18 @@ export function parseNotation(text) {
   }
   const states = c === undefined ? 2 : Number(c);
   if (!Number.isInteger(states) || states < MIN_STATES || states > MAX_STATES) return null;
-  return { birth: digits(b), survive: digits(sv), states };
+  const out = { birth: digits(b), survive: digits(sv), states };
+  if (hex) {
+    if ([...out.birth, ...out.survive].some((n) => n > 6)) return null;
+    out.neighborhood = "hex";
+  }
+  return out;
 }
 
-/** 규칙을 표기로. 상태가 3개 이상이면 B2/S/C3 처럼 C 를 붙인다 */
-export function formatNotation({ birth, survive, states = 2 }) {
+/** 규칙을 표기로. 상태가 3개 이상이면 B2/S/C3 처럼 C 를, 육각 이웃이면 끝에 H 를 붙인다 */
+export function formatNotation({ birth, survive, states = 2, neighborhood = "moore" }) {
   const core = `B${uniqSorted(birth).join("")}/S${uniqSorted(survive).join("")}`;
-  return states > 2 ? `${core}/C${states}` : core;
+  return (states > 2 ? `${core}/C${states}` : core) + (neighborhood === "hex" ? "H" : "");
 }
 
 /** (상태 s, 산 이웃 n) → 다음 상태. table[s * 9 + n] */

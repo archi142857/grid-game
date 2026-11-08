@@ -19,7 +19,14 @@ const preset = (id) => checkRuleFile(JSON.parse(readFileSync(RULES + id + ".json
 function ruleFor(code) {
   const p = parseRleRule(code);
   if (p.family === "table") return preset("wireworld");
-  return { ...preset("conway-life"), id: "x", birth: p.birth, survive: p.survive, states: Array.from({ length: p.states }, (_, i) => ({ name: String(i) })) };
+  return {
+    ...preset("conway-life"),
+    id: "x",
+    neighborhood: p.neighborhood ?? "moore",
+    birth: p.birth,
+    survive: p.survive,
+    states: Array.from({ length: p.states }, (_, i) => ({ name: String(i) })),
+  };
 }
 
 /** 무늬를 놓은 sim */

@@ -4,7 +4,7 @@
 // 화면 글은 만들지 않는다. 살펴보기의 까닭(why)은 짧은 낱말로만 돌려주고, 글은 프론트엔드가 t() 로 만든다.
 
 import { makePlane, REACH } from "./plane.js";
-import { makeTable, explain as lifeExplain } from "./life.js";
+import { makeTable, explain as lifeExplain, hexNeighbors } from "./life.js";
 import { compileAnt, stepAnts, MAX_AGENTS, TURN_LETTERS, DIR_LETTERS } from "./ant.js";
 import { stepRow, rowsKept, isLockedNumber, patternOf, nextOf, MAX_WIDTH } from "./elementary.js";
 import { compileTable, matchRow } from "./table.js";
@@ -21,6 +21,7 @@ export { MAX_CYCLIC_STATES, CYCLIC_THRESHOLD } from "./cyclic.js";
 export const MAX_TILES = 1024;
 
 const NONE = Object.freeze([]);
+const HEX = Object.freeze({ hex: true });
 
 /** (x, y) 의 무어 이웃 8칸. 왼쪽 위부터 줄 순서 */
 export const around = (x, y) => [
@@ -73,16 +74,16 @@ const regionCenter = (region) => [region.x + region.w / 2, region.y + region.h /
 function lifeSim(rule) {
   return cellSim(rule, {
     family: "life",
-    compile: (r) => ({ table: makeTable(lifeRule(r)), weights: null, stride: 9 }),
+    compile: (r) => ({ table: makeTable(lifeRule(r)), weights: null, stride: 9, opts: r.neighborhood === "hex" ? HEX : undefined }),
     /** 흩뿌리기·random 뿌리기는 산 칸(1)으로 */
     pick: null,
     /**
      * 살펴보기: 칸 하나가 다음 세대에 어떻게 되는지.
-     * { now, next, why, n(산 이웃 수), cells(이웃 8칸 자리) }. why 는 core/life.js 의 explain 과 같다
+     * { now, next, why, n(산 이웃 수), cells(이웃 자리: 무어 8칸, 육각 6칸) }. why 는 core/life.js 의 explain 과 같다
      *   born · stay · survive · die · fade · fading · gone
      */
     explain(P, r, x, y) {
-      const cells = around(x, y);
+      const cells = r.neighborhood === "hex" ? hexNeighbors(x, y) : around(x, y);
       let n = 0;
       for (const [a, b] of cells) if (P.get(a, b) === 1) n++;
       const now = P.get(x, y);

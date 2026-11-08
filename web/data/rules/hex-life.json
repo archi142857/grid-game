@@ -1,0 +1,11 @@
+{
+  "id": "hex-life",
+  "name": "육각 생명",
+  "description": "칸마다 이웃이 여섯인 육각 격자의 생명 게임이에요. 빈칸은 산 이웃이 2개면 태어나고, 산 칸은 3개나 4개면 살아남아요.",
+  "family": "life",
+  "grid": { "edges": "infinite" },
+  "neighborhood": "hex",
+  "states": [{ "name": "빈칸" }, { "name": "산 칸" }],
+  "rule": { "birth": [2], "survive": [3, 4] },
+  "seed": { "type": "random", "density": 0.35 }
+}
