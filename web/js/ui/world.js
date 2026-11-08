@@ -1,63 +1,65 @@
-// 끝없는 격자 하나와 그 규칙, 세대 수, 기록(세대마다 산 칸·바뀐 칸 수). 첫 화면과 규칙 화면이 함께 쓴다.
+// 화면이 쓰는 세계 하나: 엔진의 sim(core/sim.js) 위에 세대 수, 기록(세대마다 산 칸·바뀐 칸 수),
+// 처음 모습, 마지막으로 뿌린 자리와 씨앗 번호를 얹는다. 첫 화면과 규칙 화면이 함께 쓴다.
+// 칸과 계산은 sim 이 맡고, 계열(Life·개미·1차원·조건표)이 달라도 여기서 부르는 꼴은 같다.
 // '처음으로'는 0세대에서 넘기기 시작한 순간의 모습(origin)으로 돌아간다.
 // 칸 자리는 정수 (x, y). 가운데가 (0, 0) 이고 오른쪽·아래로 커진다.
 
-import { makeTable } from "../core/life.js";
-import { makePlane } from "../core/plane.js";
-import { parseRLE } from "../core/rle.js";
+import { makeSim, MAX_TILES } from "../core/sim.js";
 import { makeRng, randomSeed } from "../core/rng.js";
-import { lifeRule } from "../core/rules.js";
 
-/** 쓰는 조각(32×32)이 이만큼을 넘으면(약 100만 칸) 너무 넓게 퍼진 것으로 보고 멈춘다 */
-export const MAX_TILES = 1024;
+export { MAX_TILES };
 
 /** 가운데가 (cx, cy) 인 w×h 네모 */
 export const regionAt = (cx, cy, w, h) => ({ x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) });
 
 export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
-  const P = makePlane();
+  let S = makeSim(rule);
   const W = {
-    rule,
-    table: makeTable(lifeRule(rule)),
-    plane: P,
     seed: seed >>> 0,
     gen: 0,
     origin: null,
     alive: [0],
     changed: [0],
     start: 0, // alive[0] 이 몇 세대의 값인지
-    prevOk: false, // 조각마다 바로 앞 세대가 남아 있는가
     region: regionAt(0, 0, 64, 48), // 마지막으로 뿌린 자리
 
-    /** 태어남에 0 이 있으면 빈 곳 전체가 한꺼번에 태어나서 끝없는 격자에서는 돌릴 수 없다 */
-    canRun: () => W.table[0] === 0,
+    get sim() {
+      return S;
+    },
+    get rule() {
+      return S.rule;
+    },
+    get family() {
+      return S.family;
+    },
+    /** 돌릴 수 없는 규칙(Life 의 태어남 0 처럼 빈 곳이 저절로 바뀌는 것)이면 거짓 */
+    canRun: () => S.canRun(),
     /** 너무 넓게 퍼졌는가 */
     get full() {
-      return P.size > MAX_TILES;
+      return S.full;
     },
 
-    /** 규칙만 바꾼다(칸은 그대로). 상태 수가 줄면 없어진 상태의 칸은 빈칸이 된다 */
+    /**
+     * 규칙을 바꾼다. 같은 계열이면 칸은 그대로(상태 수가 줄면 없어진 상태의 칸은 빈칸),
+     * 계열이 바뀌면 sim 을 새로 만들고 비운다
+     */
     setRule(r) {
-      const fewer = r.states.length < W.rule.states.length;
-      W.rule = r;
-      W.table = makeTable(lifeRule(r));
-      if (fewer) {
-        P.clampStates(r.states.length);
-        if (W.origin) W.origin = W.origin.map(([tx, ty, c]) => [tx, ty, c.map((v) => (v < r.states.length ? v : 0))]);
-        W.touched();
+      if (r.family !== S.family) {
+        S = makeSim(r);
+        W.origin = null;
+        W.restart();
+        return;
       }
+      const fewer = r.states.length < S.rule.states.length;
+      S.setRule(r);
+      if (fewer) W.touched();
     },
 
     /** 규칙 파일의 seed 대로 region 안에 다시 뿌린다. 씨앗 번호가 같으면 같은 모습 */
     reseed(n = W.seed, region = W.region) {
       W.seed = n >>> 0;
       W.region = region;
-      P.clear();
-      const s = W.rule.seed ?? { type: "empty" };
-      const rng = makeRng(W.seed);
-      if (s.type === "random") fill(region, s.density ?? 0.3, s.area ?? 1, rng);
-      else if (s.type === "single") P.set(region.x + (region.w >> 1), region.y + (region.h >> 1), 1);
-      else if (s.type === "rle") put(parseRLE(s.data).rows, region.x + region.w / 2, region.y + region.h / 2);
+      S.seed(region, makeRng(W.seed));
       W.origin = null;
       W.restart();
     },
@@ -66,39 +68,34 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
     scatter(density, n = randomSeed(), region = W.region) {
       W.seed = n >>> 0;
       W.region = region;
-      P.clear();
-      const s = W.rule.seed;
-      fill(region, density, s && s.type === "random" ? (s.area ?? 1) : 1, makeRng(W.seed));
+      S.scatter(region, density, makeRng(W.seed));
       W.origin = null;
       W.restart();
     },
 
     clear() {
-      P.clear();
+      S.clear();
       W.origin = null;
       W.restart();
     },
 
     /** 비우고 (cx, cy) 를 가운데로 무늬를 놓는다 */
     place(rows, cx = 0, cy = 0) {
-      P.clear();
-      put(rows, cx, cy);
+      S.place(rows, cx, cy);
       W.origin = null;
       W.restart();
     },
 
     /** region 안의 산 칸과 빈칸을 뒤바꾼다(사라지는 중인 칸은 빈칸으로 본다) */
     invert(region) {
-      for (let y = region.y; y < region.y + region.h; y++) for (let x = region.x; x < region.x + region.w; x++) P.set(x, y, P.get(x, y) === 1 ? 0 : 1);
-      W.prevOk = false;
+      S.invert(region);
       W.touched();
     },
 
     /** 0세대부터 다시 센다 */
     restart() {
-      W.prevOk = false;
       W.gen = 0;
-      W.alive = [P.alive];
+      W.alive = [S.alive];
       W.changed = [0];
       W.start = 0;
     },
@@ -107,18 +104,17 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
     touched() {
       if (W.gen === 0) {
         W.origin = null;
-        W.alive = [P.alive];
-      } else W.alive[W.alive.length - 1] = P.alive;
+        W.alive = [S.alive];
+      } else W.alive[W.alive.length - 1] = S.alive;
     },
 
-    /** 한 세대를 넘긴다. 돌릴 수 없으면(태어남 0, 너무 넓음) 거짓 */
+    /** 한 번 넘긴다. 돌릴 수 없으면(막힌 규칙, 너무 넓음) 거짓 */
     step() {
-      if (!W.canRun() || W.full) return false;
-      if (W.gen === 0) W.origin = P.snapshot();
-      const res = P.step(W.table);
+      if (!S.canRun() || S.full) return false;
+      if (W.gen === 0) W.origin = S.snapshot();
+      const res = S.step();
       if (!res) return false;
-      W.prevOk = true;
-      W.gen++;
+      W.gen += res.steps;
       W.alive.push(res.alive);
       W.changed.push(res.changed);
       if (W.alive.length > keep) {
@@ -132,45 +128,39 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
     /** 처음으로: 0세대의 모습으로 */
     back() {
       if (!W.origin) return false;
-      P.restore(W.origin);
+      S.restore(W.origin);
       W.restart();
       return true;
     },
 
-    get: (x, y) => P.get(x, y),
-    set: (x, y, v) => P.set(x, y, v),
-    bounds: () => P.bounds(),
+    get: (x, y) => S.get(x, y),
+    set: (x, y, v) => S.set(x, y, v),
+    bounds: () => S.bounds(),
+    /** 살펴보기: { now, next, why, n, cells } */
+    explain: (x, y) => S.explain(x, y),
 
     /** 그리기용: (x0, y0)–(x1, y1) 에 걸친 조각마다 fn(왼쪽 위 x, y, 너비, 높이, 지금 칸, 앞 세대 칸 | null) */
-    blocks(x0, y0, x1, y1, fn) {
-      const prev = W.prevOk;
-      P.blocks(x0, y0, x1, y1, (ox, oy, s, cells, next) => fn(ox, oy, s, s, cells, prev ? next : null));
+    blocks: (x0, y0, x1, y1, fn) => S.blocks(x0, y0, x1, y1, fn),
+    /** 개미 [{ x, y, dir }] (다른 계열은 빈 배열) */
+    get agents() {
+      return S.agents;
+    },
+    /** 1차원의 지금 줄 y (다른 계열은 null) */
+    get head() {
+      return S.head;
     },
 
     get count() {
-      return P.alive;
+      return S.alive;
+    },
+    /** 쓰고 있는 조각 수(넓게 퍼질수록 커진다) */
+    get size() {
+      return S.size;
     },
     get lastChanged() {
       return W.changed[W.changed.length - 1];
     },
   };
-
-  function fill(region, density, area, rng) {
-    const aw = Math.max(1, Math.round(region.w * area));
-    const ah = Math.max(1, Math.round(region.h * area));
-    const x0 = region.x + Math.floor((region.w - aw) / 2);
-    const y0 = region.y + Math.floor((region.h - ah) / 2);
-    for (let y = y0; y < y0 + ah; y++) for (let x = x0; x < x0 + aw; x++) if (rng.next() < density) P.set(x, y, 1);
-  }
-
-  /** 무늬(줄마다 상태 배열)를 (cx, cy) 가운데에 놓는다. 규칙에 없는 상태는 버린다 */
-  function put(rows, cx, cy) {
-    const states = W.rule.states.length;
-    const pw = Math.max(0, ...rows.map((r) => r.length));
-    const x0 = Math.round(cx - pw / 2);
-    const y0 = Math.round(cy - rows.length / 2);
-    rows.forEach((row, y) => row.forEach((s, x) => s && s < states && P.set(x0 + x, y0 + y, s)));
-  }
 
   W.restart();
   return W;

@@ -3,7 +3,7 @@
 
 import { h, icon, ICON, setTitle, reducedMotion } from "../ui/dom.js";
 import { t, num } from "../i18n.js";
-import { formatNotation, parseNotation, explain, MAX_STATES } from "../core/life.js";
+import { formatNotation, parseNotation, MAX_STATES } from "../core/life.js";
 import { checkRuleFile, toRuleFile, formatRuleFile, resizeStates, lifeRule, sameRule } from "../core/rules.js";
 import { parseRLE } from "../core/rle.js";
 import { randomSeed } from "../core/rng.js";
@@ -348,9 +348,9 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       return;
     }
     const [x, y] = lc;
-    const s = world.get(x, y);
-    const n = around(x, y).filter(([a, b]) => world.get(a, b) === 1).length;
-    const ex = explain(lifeRule(rule), s, n);
+    const ex = world.explain(x, y);
+    const s = ex.now;
+    const n = ex.n;
     const name = (i) => rule.states[i]?.name ?? String(i);
     peek.replaceChildren(
       h("div", { class: "peek-top" }, h("span", { class: "num" }, String(n)), h("span", {}, t("산 이웃"))),

@@ -131,7 +131,7 @@ function makeHero(presets) {
     const a = world.alive;
     // 보여 주는 중에는 화면 네 배쯤 넘게 퍼지면 새로 뿌린다(첫 화면이 무거워지지 않게)
     const s = board.span();
-    if (world.plane.size > Math.max(160, ((s.w / 32 + 2) * (s.h / 32 + 2)) * 4)) return void world.reseed(randomSeed(), viewRegion());
+    if (world.size > Math.max(160, ((s.w / 32 + 2) * (s.h / 32 + 2)) * 4)) return void world.reseed(randomSeed(), viewRegion());
     if (world.count === 0 && world.gen > 20) return void world.reseed(randomSeed(), viewRegion());
     if (world.gen < 300 || a.length < 150) return;
     let lo = Infinity;
