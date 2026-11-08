@@ -209,3 +209,28 @@ test("도전 과제: 문제마다 제목·할 일·힌트가 있고, 할 일의 
   });
   if (problems.length) tt.diagnostic(`도전 과제 글 확인: ${problems.join(" | ")}`);
 });
+
+test("코드 규칙 글: 도움말·예시 설명이 있고, 오류마다 한 줄이 다 채워진다", async (tt) => {
+  const { CODE_HELP, EXAMPLE_NOTES, codeErrorText, CODE_LOCKED } = await import("../web/js/data/code-help.js");
+  assert.ok(CODE_HELP().length > 0 && EXAMPLE_NOTES().length > 0 && CODE_LOCKED());
+  const errors = [
+    { kind: "empty" },
+    { kind: "long", value: 30000 },
+    { kind: "states", value: 9 },
+    { kind: "syntax", message: "Unexpected token" },
+    { kind: "notfunction", value: "3" },
+    { kind: "throw", state: 1, counts: [5, 3], message: "x is not defined" },
+    { kind: "value", state: 0, counts: [8, 0], value: "undefined" },
+    { kind: "뭔지 모를 것" },
+  ];
+  for (const e of errors) {
+    const line = codeErrorText(e, 2);
+    assert.ok(line && !/\{\w+\}/.test(line), `${e.kind}: ${line}`);
+  }
+  assert.match(codeErrorText(errors[6], 2), /0–1/);
+  // 오류 종류는 엔진(core/code.js)이 정한다. 글이 없는 새 종류는 main 을 막지 않고 알림으로 띄운다
+  const src = readFileSync(join(ROOT, "web/js/core/code.js"), "utf8");
+  const kinds = [...src.matchAll(/codeError\("(\w+)"/g)].map((m) => m[1]);
+  const noText = kinds.filter((k) => !errors.some((e) => e.kind === k));
+  if (noText.length) tt.diagnostic(`글이 없는 코드 오류 종류: ${noText.join(", ")}`);
+});

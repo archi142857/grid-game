@@ -452,6 +452,8 @@ export const EN = {
   "rule.birth: 육각 이웃은 0–6 사이 정수의 배열이어야 해요": "rule.birth: with hexagonal neighbors, must be an array of integers from 0 to 6",
   "rule.survive: 육각 이웃은 0–6 사이 정수의 배열이어야 해요": "rule.survive: with hexagonal neighbors, must be an array of integers from 0 to 6",
   "rule.threshold: 1–{max} 사이 정수여야 해요": "rule.threshold: must be an integer from 1 to {max}",
+  "rule.source: 코드 글이 있어야 해요": "rule.source: needs code",
+  "rule.source: 코드는 {max}자까지예요": "rule.source: code can be up to {max} characters",
   "rule.number: 끝없는 격자에서는 홀수 번호(000 → 1)를 쓸 수 없어요": "rule.number: odd numbers (000 → 1) can't be used on an endless grid",
   "rule.transitions: 줄을 {max}개까지 배열로 적어요": "rule.transitions: list up to {max} lines in an array",
   "rule.transitions[{i}]: from·to 는 상태 번호, when 은 { state, count } 꼴이어야 해요":
@@ -506,6 +508,34 @@ export const EN = {
   "전자 머리": "Electron head",
   "전자 꼬리": "Electron tail",
   "도선": "Wire",
+
+  // ── data/code-help.js: 코드로 규칙 쓰기 ─────────────────────────────
+  "칸마다 부를 함수를 하나 써요. 함수는 지금 상태(state)와 상태별 이웃 수(counts)를 받아 다음 상태를 돌려줘요.":
+    "Write one function to call for each cell. It takes the current state (state) and the neighbor count for each state (counts), and returns the next state.",
+  "state 는 지금 칸의 상태 번호예요(0부터). counts 는 이웃 여덟 칸을 상태마다 센 배열이라, counts[1] 은 상태 1 인 이웃의 수예요. 모두 더하면 8 이에요.":
+    "state is the current cell's state number, starting from 0. counts is an array that counts the eight neighbors by state, so counts[1] is the number of neighbors in state 1. They always add up to 8.",
+  "돌려줄 값은 0부터 상태 수 − 1 사이의 정수예요. 상태는 {min}–{max}개까지 쓸 수 있어요.":
+    "Return an integer from 0 to the number of states − 1. You can use {min}–{max} states.",
+  "'돌리기'를 누르면 함수를 경우마다 한 번씩만 불러 표를 만들고, 그다음은 표로 돌아요. 그래서 같은 입력에는 늘 같은 값을 돌려줘야 해요.":
+    "When you press Run, the function is called just once for each case to build a table, and the grid then runs from that table. So the same input must always give the same result.",
+  "이웃이 모두 빈칸인 빈칸(상태 0)은 0 으로 남아야 해요. 끝없는 격자에서는 빈 곳이 한꺼번에 바뀌어 버리거든요.":
+    "An empty cell (state 0) whose neighbors are all empty must stay 0. Otherwise all the empty space on the endless grid would change at once.",
+  "예시는 생명 게임(B3/S23)이에요. 상태는 빈칸(0)과 산 칸(1) 둘이에요.": "The example is the Game of Life (B3/S23). It has two states: empty (0) and alive (1).",
+  "빈칸이면 산 이웃(counts[1])이 꼭 3개일 때 1, 아니면 0 을 돌려줘요. 태어남 3 이에요.":
+    "For an empty cell, it returns 1 when there are exactly 3 live neighbors (counts[1]), and 0 otherwise. That's Born 3.",
+  "산 칸이면 산 이웃이 2개나 3개일 때 1, 아니면 0 이에요. 살아남음 2, 3 이에요.": "For a live cell, it returns 1 with 2 or 3 live neighbors, and 0 otherwise. That's Survive 2, 3.",
+  "숫자를 바꾸거나, 상태를 늘리고 counts[2] 를 써서 나만의 규칙을 만들어 보세요.": "Change the numbers, or add states and use counts[2], to make a rule of your own.",
+  "코드가 비어 있어요.": "The code is empty.",
+  "코드가 너무 길어요. {max}자까지 쓸 수 있어요.": "The code is too long. You can write up to {max} characters.",
+  "상태는 {min}–{max}개여야 해요.": "There must be {min}–{max} states.",
+  "코드를 읽을 수 없어요: {message}": "Can't read the code: {message}",
+  "함수가 아니에요. (state, counts) => … 꼴로 써 주세요.": "That's not a function. Write it as (state, counts) => …",
+  "state {state}, counts {counts} 에서 오류가 났어요: {message}": "Error at state {state}, counts {counts}: {message}",
+  "state {state}, counts {counts} 에서 돌려준 값({value})이 0–{max} 사이 정수가 아니에요.":
+    "At state {state}, counts {counts}, the returned value ({value}) isn't an integer from 0 to {max}.",
+  "코드를 돌리지 못했어요.": "Couldn't run the code.",
+  "이웃이 모두 빈칸인 빈칸이 바뀌어서 끝없는 격자에서는 돌릴 수 없어요. 그때는 0 을 돌려주게 고쳐 주세요.":
+    "An empty cell with only empty neighbors would change, so this can't run on an endless grid. Make it return 0 in that case.",
 
   // ── data/challenges.js: 도전 과제 ─────────────────────────────
   "멈춘 무늬": "Still life",
