@@ -486,8 +486,6 @@ export const EN = {
   "꺼지는 중": "Dying",
   "사라지는 칸 1": "Dying 1",
   "사라지는 칸 2": "Dying 2",
-  "LLRR 개미": "LLRR ant",
-  "LRRRRRLLR 개미": "LRRRRRLLR ant",
   "피보나치 나선 터마이트": "Fibonacci spiral turmite",
   "칠한 칸": "Painted",
   "색 1": "Color 1",
