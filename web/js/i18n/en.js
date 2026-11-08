@@ -1,4 +1,424 @@
-// 영어 사전. 열쇠는 화면에서 t("…") 로 부르는 한국어 틀 그대로다.
-// 영어판을 붙일 때 여기를 채우고 i18n.js 의 setLang("en") 으로 켠다. 비어 있으면 한국어가 나간다.
+// 영어 사전. 열쇠는 화면에서 t("…") 로 부르는 한국어 틀 그대로다. 비어 있는 열쇠는 한국어가 나간다.
+// 자리표: 한국어의 {n:이가} 는 영어에서 {n} 로 쓴다. 단수·복수는 {n|neighbor|neighbors} (값이 1이면 앞, 아니면 뒤).
+// 용어: 칸 cell · 산 칸 Alive / live cell · 빈칸 Empty / empty cell · 세대 generation · 태어남 Born · 살아남음 Survive
+//       도감 Field guide · 처음으로 Reset · 흩뿌리기 Scatter · 비우기 Clear · 손 Tool(이동 Move · 그리기 Draw · 살펴보기 Inspect)
+// 규칙 파일의 이름·상태 이름(콘웨이의 생명 게임, 꺼지는 중 …)도 여기 있다. 화면이 t(이름) 으로 부르면 영어가 나간다.
 
-export const EN = {};
+export const EN = {
+  // ── app.js ─────────────────────────────
+  "화면을 그리지 못했어요": "Couldn't draw this screen",
+  "기기 설정": "System",
+  "밝게": "Light",
+  "어둡게": "Dark",
+  "화면 밝기: {s}. 눌러서 바꾸기": "Theme: {s}. Press to change",
+  "화면 밝기: {s}": "Theme: {s}",
+  "규칙을 불러오지 못했어요": "Couldn't load the rules",
+  "새로고침해 보세요. 파일을 바로 열었다면 작은 웹 서버로 열어야 해요.": "Try reloading. If you opened the file directly, serve it from a small web server instead.",
+
+  // ── ui ─────────────────────────────
+  "격자 게임": "Grid Game",
+  "격자 다루기": "Grid controls",
+  "한 세대": "Step",
+  "처음으로": "Reset",
+  "흩뿌리기": "Scatter",
+  "비우기": "Clear",
+  "일시정지": "Pause",
+  "재생": "Play",
+  "축소": "Zoom out",
+  "확대": "Zoom in",
+  "산 칸이 모두 보이게": "Fit all live cells",
+  "전체 화면": "Full screen",
+  "보기": "View",
+  "전체 화면 끝내기": "Exit full screen",
+  "세대마다 산 칸 수": "Live cells per generation",
+  "{g}세대": "Gen {g}",
+  "산 칸 {n}": "Alive {n}",
+
+  // 규칙 숫자 점(rulepad). 규칙 설명은 "앞 반, 뒤 반." 으로 이어 붙는다
+  "빈칸은 산 이웃이 {list}개면 태어나고": "An empty cell is born with {list} live {list|neighbor|neighbors}",
+  "빈칸은 태어나지 않고": "Empty cells are never born",
+  "산 칸은 죽지 않아요.": "and live cells never die.",
+  "산 칸은 다음 세대에 바로 사라지기 시작해요.": "and live cells start fading right away.",
+  "산 칸은 다음 세대에 모두 죽어요.": "and every live cell dies in the next generation.",
+  "산 칸은 {list}개면 살아남아요.": "and a live cell survives with {list}.",
+  "살아남지 못한 칸은 {k}세대 동안 흐려지다가 사라져요.": "Cells that don't survive fade for {k} {k|generation|generations} before they disappear.",
+  "끝없는 격자에서는 태어남 0을 쓸 수 없어요. 빈 곳이 끝없이 한꺼번에 태어나거든요.":
+    "Born 0 can't be used on an endless grid: all the empty space would come alive at once.",
+  "태어남": "Born",
+  "빈칸 둘레에 산 칸이 {n}개면 태어나요": "An empty cell with {n} live {n|neighbor|neighbors} is born",
+  "살아남음": "Survive",
+  "산 칸 둘레에 산 칸이 {n}개면 살아남아요": "A live cell with {n} live {n|neighbor|neighbors} survives",
+  "규칙 표기": "Rule notation",
+  "고쳐 쓰고 Enter": "Edit and press Enter",
+  "읽을 수 없는 표기예요. 예: B3/S23, B2/S/C3, 23/3": "Can't read that notation. Examples: B3/S23, B2/S/C3, 23/3",
+
+  // ── views/common.js ─────────────────────────────
+  "도감": "Field guide",
+  "없는 화면": "Not found",
+  "없는 화면이에요": "There's no such page",
+  "주소를 다시 확인하거나 도감에서 골라 주세요.": "Check the address, or pick a rule from the field guide.",
+
+  // ── views/home.js ─────────────────────────────
+  "끝없는 격자. 끌면 둘러보고, 칸을 누르면 살리거나 비워요": "Endless grid. Drag to look around; press a cell to bring it to life or clear it",
+  "칸을 눌러 살릴 칸을 고른 다음, 재생을 눌러 보세요.": "Press cells to choose which ones live, then press Play.",
+  "세대": "Generation",
+  "산 칸": "Alive",
+  "이름난 규칙": "Famous rules",
+  "너무 넓게 퍼져서 멈췄어요. 흩뿌리기나 비우기로 다시 시작해 보세요.": "It spread too far, so it stopped. Start over with Scatter or Clear.",
+  "{name} 자세히 보기": "More about {name}",
+  "직접 고친 규칙이에요.": "This is your own rule.",
+  "{code} 이어서 고치기": "Keep editing {code}",
+  "두 손가락으로 끌거나 전체 화면에서 둘러보세요": "Drag with two fingers, or look around in full screen",
+  "{key}을 누른 채 휠을 굴리면 확대·축소돼요": "Hold {key} and scroll to zoom",
+  "숫자 두 줄이 만드는": "Two rows of numbers,",
+  "살아 있는 세계": "one living world",
+  "칸마다 이웃 여덟 칸만 보고 다음 세대에 살지 죽을지 정해요. 이런 세계를 세포 자동자라고 해요. 격자는 끝없이 이어져서, 끌면 어디로든 둘러볼 수 있어요.":
+    "Each cell looks only at its eight neighbors to decide whether it lives or dies in the next generation. A world like this is called a cellular automaton. The grid goes on forever, so you can drag to explore in any direction.",
+  "작은 격자. 칸을 눌러 고를 수 있어요": "Small grid. Press a cell to pick it",
+  "칸": "Cells",
+  "세계는 바둑판처럼 칸으로 나뉘어요. 칸마다 상태가 하나 있어요. 생명 게임에서는 살았거나 비었거나 둘 중 하나예요.":
+    "The world is divided into cells, like a checkerboard. Each cell has one state. In the Game of Life, a cell is either alive or empty.",
+  "이웃 세기": "Count neighbors",
+  "칸마다 둘레 여덟 칸을 이웃으로 보고, 그 가운데 산 칸을 세요. 그림의 칸을 눌러 다른 칸도 세어 보세요.":
+    "Each cell treats the eight cells around it as neighbors and counts the live ones. Press a cell in the picture to count for another cell.",
+  "다음 세대": "Next generation",
+  "센 수와 규칙으로 다음 상태를 정해요. 모든 칸이 한꺼번에 바뀌면 한 세대가 지나요. 색이 다른 점은 방금 태어난 칸이에요.":
+    "The count and the rule decide the next state. When every cell has changed at once, one generation has passed. Dots in a different color were just born.",
+  "한 세대 더": "One more generation",
+  "{r}째 줄 {c}째 칸, {s}": "Row {r}, column {c}, {s}",
+  "고른 칸의 산 이웃": "Live neighbors of the picked cell",
+  "산 이웃 {n}개라서": "{n} live {n|neighbor|neighbors}, so it",
+  "태어나요": "is born",
+  "그대로": "stays empty",
+  "살아요": "lives on",
+  "죽어요": "dies",
+  "한 세대는 세 단계로 지나가요": "A generation passes in three steps",
+  "세포 자동자는 칸으로 나뉜 세계예요. 모든 칸이 같은 규칙을 따라 한꺼번에 바뀌고, 그렇게 한 번 바뀌는 것을 한 세대라고 해요.":
+    "A cellular automaton is a world divided into cells. Every cell follows the same rule and changes at the same moment, and each such change is called a generation.",
+  "이 규칙을 ": "This rule is written as ",
+  " 이라고 적어요. B는 태어남, S는 살아남음이에요.": ". B stands for born, S for survive.",
+  "만든 사람은 알려지지 않았어요": "Creator unknown",
+  "새 규칙 만들기": "Make a new rule",
+  "점을 눌러 숫자를 골라요": "Press the dots to pick numbers",
+  "이름난 규칙 {n}가지를 모았어요. 그림을 누르면 크게 돌려 볼 수 있어요.": "{n} famous rules in one place. Press a picture to run it big.",
+  "다음에 들어올 규칙: {list}": "Coming next: {list}",
+
+  // ── views/rule.js ─────────────────────────────
+  "느리게": "Slow",
+  "보통": "Normal",
+  "빠르게": "Fast",
+  "태어남에 {n:이가} 있어요": "Born includes {n}",
+  "태어남에 {n:이가} 없어요": "Born doesn't include {n}",
+  "살아남음에 {n:이가} 있어요": "Survive includes {n}",
+  "살아남음에 {n:이가} 없어요": "Survive doesn't include {n}",
+  "살아남음에 {n:이가} 없어 사라지기 시작해요": "Survive doesn't include {n}, so it starts to fade",
+  "사라지는 중이라 한 단계 더 흐려져요": "It's fading, so it dims one more step",
+  "마지막 단계라 빈칸이 돼요": "It's the last step, so it becomes empty",
+  "끌어서 둘러보고, 칸을 눌러 살리거나 비워요. 휠이나 두 손가락으로 확대·축소해요.":
+    "Drag to look around, and press cells to bring them to life or clear them. Zoom with the wheel or two fingers.",
+  "끌어서 칸을 그려요. 산 칸에서 시작하면 지워요. 둘러보려면 오른쪽 단추나 두 손가락으로 끌어요.":
+    "Drag to draw cells. Start on a live cell to erase instead. To look around, drag with the right mouse button or two fingers.",
+  "칸에 커서를 올리거나 눌러 보세요. 이웃을 세고 다음 세대를 알려 줘요.": "Hover over or press a cell. It counts the neighbors and tells you the next generation.",
+  "내 규칙": "My rule",
+  "새 규칙": "New rule",
+  "빠르기": "Speed",
+  "1초에 {n}세대": "{n} generations per second",
+  "손": "Tool",
+  "이동": "Move",
+  "이동: 끌어서 둘러보기": "Move: drag to look around",
+  "그리기": "Draw",
+  "그리기: 끌어서 칸 그리기": "Draw: drag to draw cells",
+  "살펴보기": "Inspect",
+  "살펴보기: 칸의 이웃과 다음 세대": "Inspect: a cell's neighbors and next generation",
+  "원래대로": "Restore",
+  "상태 수": "States",
+  "상태 하나 빼기": "One fewer state",
+  "상태 하나 더하기": "One more state",
+  "규칙과 기록": "Rule and history",
+  "규칙": "Rule",
+  "기록": "History",
+  "바뀐 칸": "Changed",
+  "더 보기": "More",
+  "3 이상이면 죽는 칸이 그만큼 단계를 거쳐 사라져요.": "At 3 or more, dying cells fade out step by step instead of vanishing at once.",
+  "규칙 파일": "Rule file",
+  "내려받기": "Download",
+  "불러오기": "Open",
+  "점을 눌러 규칙을 정하고, 칸을 그려 시작 모습을 만들어요. 마음에 들면 규칙 파일로 내려받으세요.":
+    "Press the dots to set the rule, and draw cells to make a starting pattern. If you like it, download it as a rule file.",
+  "요령": "Tips",
+  "다른 규칙 써 보기": "Try other rules",
+  "이 규칙은": "About this rule",
+  "볼 것": "Things to try",
+  "끌어서 칸을 그린 다음, 재생을 눌러 보세요.": "Drag to draw cells, then press Play.",
+  "산 이웃": "alive nearby",
+  "지금 ": "Now ",
+  ", 다음 세대 ": ", next generation ",
+  "{code} 만들기": "Making {code}",
+  "JSON 으로 읽을 수 없어요: {m}": "Can't read this as JSON: {m}",
+  "놓아 보기": "Place it",
+  "써 보기": "Try it",
+  "뒤집기": "Invert",
+
+  // ── views/about.js ─────────────────────────────
+  "소개": "About",
+  "세포 자동자를 바로 돌려 보고, 규칙을 직접 만들어 보는 곳이에요.": "A place to run cellular automata right away and make rules of your own.",
+  "무엇을 하나요": "What you can do",
+  "이름난 규칙 {n}가지를 도감으로 모았어요. 태어남과 살아남음의 숫자를 눌러 규칙을 고치거나, 아예 새로 만들 수 있어요.":
+    "The field guide collects {n} famous rules. Press the Born and Survive numbers to change a rule, or make a brand-new one.",
+  "처음이라면 첫 화면의 점 단추만 눌러 봐도 충분해요. 더 파고들고 싶다면 B3/S23 같은 표기를 바로 고쳐 쓰거나, 규칙 파일을 내려받아 고친 뒤 다시 불러오세요. 가입은 없고, 설정은 이 브라우저에만 남아요.":
+    "If you're new, pressing the dot buttons on the home page is enough. To dig deeper, edit notation like B3/S23 directly, or download a rule file, change it and open it again. There's no sign-up, and your settings stay in this browser only.",
+  "세포 자동자의 짧은 역사": "A short history of cellular automata",
+  "칸으로 나뉜 세계에서 모든 칸이 같은 규칙을 따라 한꺼번에 바뀌어요. 규칙은 짧아도 결과는 미리 알기 어려워서, 생물의 무늬나 결정이 자라는 모습, 계산 자체를 연구하는 도구로 쓰여요.":
+    "In a world divided into cells, every cell changes at once by the same rule. The rules are short, but the results are hard to predict, so they're used to study patterns in living things, the growth of crystals, and computation itself.",
+  "존 폰 노이만과 스타니스와프 울람이 스스로를 복제하는 기계를 칸의 세계로 설계했어요.": "John von Neumann and Stanisław Ulam designed a self-replicating machine in a world of cells.",
+  "존 콘웨이의 생명 게임이 마틴 가드너의 칼럼에 실려 널리 알려졌어요.": "John Conway's Game of Life became widely known through Martin Gardner's column.",
+  "스티븐 울프럼이 한 줄짜리 세포 자동자 256가지를 체계적으로 살폈어요.": "Stephen Wolfram systematically studied all 256 one-row cellular automata.",
+  "크리스 랭턴이 칸 위를 걷는 개미 규칙을 내놓았어요.": "Chris Langton introduced an ant that walks across the cells.",
+  "하이라이프, 낮과 밤, 브라이언의 뇌처럼 생명 게임을 고친 규칙이 많이 나왔어요.": "Many variations on the Game of Life appeared, such as HighLife, Day & Night and Brian's Brain.",
+  "B 뒤의 숫자는 빈칸이 태어나는 산 이웃 수, S 뒤의 숫자는 산 칸이 살아남는 산 이웃 수예요. 상태가 셋 이상이면 C 뒤에 상태 수를 붙여요. 생명 게임은 B3/S23, 브라이언의 뇌는 B2/S/C3 이에요.":
+    "The digits after B are the live-neighbor counts at which an empty cell is born, and the digits after S are the counts at which a live cell survives. With three or more states, the number of states comes after C. The Game of Life is B3/S23, and Brian's Brain is B2/S/C3.",
+  "살아남음/태어남 차례로 적는 옛 꼴(23/3)과 Generations 꼴(345/2/4)도 읽어요. Golly 나 LifeWiki 의 표기를 그대로 붙여 넣으면 돼요.":
+    "It also reads the older survive/born order (23/3) and the Generations form (345/2/4), so you can paste notation straight from Golly or LifeWiki.",
+  "규칙 하나는 JSON 파일 한 장이에요. 규칙 화면의 '더 보기'에서 내려받고, 고친 뒤 다시 불러와요. 아래는 생명 게임의 파일이에요.":
+    "Each rule is a single JSON file. Download it from 'More' on a rule page, edit it, and open it again. Here is the file for the Game of Life.",
+  "계산은 이렇게 해요": "How it computes",
+  "격자는 끝없이 이어져요. 판을 32×32 조각으로 나누고, 칸이 있는 조각만 둬요. 가장자리에 산 칸이 닿은 조각은 그쪽에 빈 조각을 미리 만들어 두어서, 무늬는 어디로든 자라 나갈 수 있어요.":
+    "The grid has no edges. The plane is split into 32×32 tiles, and only tiles with cells in them are kept. When a live cell reaches a tile's edge, an empty tile is prepared on that side, so patterns can grow in any direction.",
+  "칸마다 (지금 상태, 산 이웃 수) → 다음 상태 표를 미리 만들어 두고 찾기만 하므로, 숫자를 바꿔도 빠르기가 같아요. 무늬가 100만 칸쯤 되는 넓이로 퍼지면 멈춰요.":
+    "A table from (current state, live neighbors) to the next state is built in advance and simply looked up, so changing the numbers doesn't change the speed. If a pattern spreads over an area of about a million cells, it stops.",
+  "태어남 0은 쓸 수 없어요. 끝없는 격자에서는 빈 곳이 모두 한꺼번에 태어나 버리거든요. 화면에서는 방금 태어난 칸을 신호색으로, 사라지는 칸을 점점 작아지는 점으로 그려요.":
+    "Born 0 isn't allowed: on an endless grid, all the empty space would come alive at once. On screen, cells that were just born are drawn in the signal color, and dying cells as shrinking dots.",
+  "다루기": "Controls",
+  "끌기": "Drag",
+  "둘러봐요. 그리기 손일 때는 칸을 그리고, 오른쪽 단추로 끌면 둘러봐요": "Look around. With the Draw tool it draws cells; drag with the right button to look around",
+  "누르기": "Press",
+  "칸을 살리거나 비워요": "Bring a cell to life or clear it",
+  "휠·두 손가락": "Wheel · two fingers",
+  "확대·축소해요. 첫 화면에서는 Ctrl(⌘)을 누른 채 휠을 굴려요(전체 화면에서는 그냥 휠)":
+    "Zoom in and out. On the home page, hold Ctrl (⌘) while scrolling (in full screen, just scroll)",
+  "스페이스": "Space",
+  "재생하거나 일시정지해요": "Play or pause",
+  "한 세대 넘겨요": "Step one generation",
+  "처음 모습으로 돌아가요": "Go back to the starting pattern",
+  "격자를 전체 화면으로 보거나 끝내요": "Enter or exit full screen",
+  "확대·축소해요": "Zoom in and out",
+  "산 칸이 모두 보이게 맞춰요": "Fit all live cells in view",
+  "Shift + 화살표": "Shift + arrows",
+  "화면 4분의 1씩 둘러봐요(규칙 화면)": "Look around a quarter screen at a time (rule pages)",
+  "살펴보는 칸을 놓거나 전체 화면을 끝내요": "Let go of the inspected cell or exit full screen",
+  "출처": "Sources",
+  "규칙의 이름과 만든 사람, 무늬는 아래 자료를 따랐어요.": "Rule names, creators and patterns follow these sources.",
+  "라이선스": "License",
+  "코드는 MIT 라이선스예요. 글꼴은 Pretendard(© Kil Hyung-jin)와 Doto(© The Doto Project Authors)이고 둘 다 SIL Open Font License 1.1 이에요. jsDelivr 로 불러와요.":
+    "The code is under the MIT License. The fonts are Pretendard (© Kil Hyung-jin) and Doto (© The Doto Project Authors), both under the SIL Open Font License 1.1, loaded from jsDelivr.",
+  "만든 사람": "Made by",
+  "서울대학교 동물생명공학전공 25학번 이영표. 버그 제보와 새 규칙 제안은 ":
+    "Lee Youngpyo, Animal Biotechnology, Seoul National University (admitted 2025). Bug reports and new rule ideas are welcome as ",
+  "GitHub 이슈": "GitHub issues",
+  "로 받아요.": ".",
+
+  // ── data/catalog.js: 도감 ─────────────────────────────
+  "생명 게임": "Game of Life",
+  "존 콘웨이, 1970": "John Conway, 1970",
+  "가장 유명한 세포 자동자예요. 기어가는 글라이더가 저절로 생겨요.": "The most famous cellular automaton. Crawling gliders appear on their own.",
+  "1970년 영국 수학자 존 콘웨이가 만들었고, 마틴 가드너가 사이언티픽 아메리칸의 수학 놀이 칼럼에 소개하면서 널리 퍼졌어요. 사람은 처음 모습만 정하고, 그다음은 규칙이 알아서 굴러가요.":
+    "British mathematician John Conway created it in 1970, and it spread widely after Martin Gardner featured it in his Mathematical Games column in Scientific American. You only choose the starting pattern; the rule takes it from there.",
+  "규칙은 두 줄뿐인데 그 안에서 움직이는 무늬, 끝없이 자라는 무늬, 다른 무늬를 쏘아 내는 무늬가 나와요. 잘 짜 맞추면 컴퓨터가 하는 계산을 모두 흉내 낼 수 있다는 것도 밝혀졌어요.":
+    "The rule is only two lines, yet it produces patterns that move, patterns that grow forever, and patterns that shoot out other patterns. It has even been shown that, arranged just right, it can imitate any computation a computer can do.",
+  "글라이더": "Glider",
+  "다섯 칸이 네 세대마다 대각선으로 한 칸씩 기어가요.": "Five cells that crawl one cell diagonally every four generations.",
+  "고스퍼 글라이더 총": "Gosper glider gun",
+  "1970년 빌 고스퍼가 찾았어요. 30세대마다 글라이더를 하나씩 쏘아 내요.": "Found by Bill Gosper in 1970. It fires a glider every 30 generations.",
+  "R-펜토미노": "R-pentomino",
+  "다섯 칸에서 시작해 1103세대가 지나서야 잠잠해져요. 날아가는 글라이더도 끌어서 따라가 보세요.":
+    "Five cells that take 1103 generations to settle down. Drag along to follow the gliders that fly off.",
+  "태어남에 6 더하기": "Add 6 to Born",
+  "숫자 하나만 더해도 스스로를 복제하는 무늬가 사는 하이라이프가 돼요.": "Add just one number and it becomes HighLife, home of a self-replicating pattern.",
+  "하이라이프": "HighLife",
+  "네이선 톰프슨, 1994": "Nathan Thompson, 1994",
+  "생명 게임에 6 하나를 더했더니 스스로를 복제하는 무늬가 생겼어요.": "Add a single 6 to the Game of Life, and a self-replicating pattern appears.",
+  "1994년 네이선 톰프슨이 생명 게임의 태어남에 6 하나를 더해 만들었어요. 생명 게임의 작은 무늬는 대부분 여기서도 똑같이 움직여요.":
+    "Nathan Thompson made it in 1994 by adding a 6 to Born in the Game of Life. Most small Life patterns behave the same way here.",
+  "다른 점은 생명 게임에 없는 작은 복제자예요. 복제자는 12세대마다 자기와 똑같은 무늬를 하나 더 만들어요.":
+    "The difference is a small replicator that Life doesn't have. Every 12 generations it makes another copy of itself.",
+  "복제자": "Replicator",
+  "12세대 뒤에 똑같은 무늬가 둘이 되고, 계속 늘어나며 대각선으로 줄지어 퍼져요.": "After 12 generations there are two identical copies, and they keep multiplying along a diagonal line.",
+  "폭격기": "Bomber",
+  "복제자가 깜빡이를 끌고 가며 48세대마다 대각선으로 8칸씩 나아가요.": "A replicator hauls a blinker along, moving 8 cells diagonally every 48 generations.",
+  "씨앗": "Seeds",
+  "브라이언 실버먼": "Brian Silverman",
+  "산 칸은 한 세대만 살아요. 그래도 몇 칸이면 끝없이 번져요.": "Live cells last just one generation, yet a few of them spread without end.",
+  "브라이언 실버먼이 살펴본 규칙으로, 이름은 미렉 보이토비치가 붙였어요. 산 칸은 모두 한 세대만 살고 사라져요.":
+    "A rule explored by Brian Silverman and named by Mirek Wójtowicz. Every live cell lives for one generation and then disappears.",
+  "그런데도 거의 모든 무늬가 폭발하듯 퍼져 나가요. 가운데의 작은 씨앗이 끝없이 번져 나가는 모습을 보세요. 너무 넓게 퍼지면 멈춰요.":
+    "Even so, almost every pattern explodes outward. Watch the small seed in the middle spread on and on. It stops if it spreads too far.",
+  "네 칸": "Four cells",
+  "정사각형 네 칸이 폭발하듯 퍼져 나가요.": "A square of four cells explodes outward.",
+  "한 세대 쉬어 가기": "Rest for a generation",
+  "산 칸이 바로 빈칸이 되지 않고 한 세대 쉬어 가게 하면 브라이언의 뇌가 돼요.": "Let live cells rest for one generation instead of emptying at once, and you get Brian's Brain.",
+  "낮과 밤": "Day & Night",
+  "네이선 톰프슨, 1997": "Nathan Thompson, 1997",
+  "산 칸과 빈칸을 뒤바꿔도 똑같이 굴러가는 세계예요.": "A world that runs the same way even when live and empty cells are swapped.",
+  "1997년 네이선 톰프슨이 만들고 데이비드 벨이 자세히 살펴본 규칙이에요. 산 칸과 빈칸을 모두 뒤바꿔도, 앞으로 일어날 일이 똑같이 뒤바뀌어 일어나요.":
+    "Made by Nathan Thompson in 1997 and studied in depth by David Bell. Swap every live and empty cell, and whatever happens next happens just the same, only swapped.",
+  "그래서 빈 바다에 뜬 산 섬과 산 땅에 뚫린 빈 구멍이 같은 방식으로 움직여요. 반쯤 채워 돌리면 낮과 밤의 땅이 생기고, 경계가 다듬어지며 점점 큰 덩어리로 뭉쳐요.":
+    "So a live island in an empty sea moves just like an empty hole in live land. Fill it about halfway and run it: lands of day and night form, their borders smooth out, and they merge into ever larger blobs.",
+  "낮과 밤 뒤집기": "Swap day and night",
+  "보이는 칸을 모두 뒤바꿔 보세요. 뒤집힌 곳도 같은 규칙으로 똑같이 굴러가요.": "Swap every visible cell. The inverted area keeps running the same way under the same rule.",
+  "미로": "Maze",
+  "잘 죽지 않는 칸들이 벽과 복도를 쌓아요.": "Hard-to-kill cells build walls and corridors.",
+  "태어나는 조건은 생명 게임과 같지만, 산 칸은 이웃이 1개에서 5개 사이면 모두 살아남아요. 죽기가 어려우니 작은 씨앗이 자라며 벽과 복도가 또렷한 미로를 그려요.":
+    "Cells are born just as in the Game of Life, but a live cell survives with anywhere from 1 to 5 neighbors. Since dying is hard, a small seed grows into a maze with crisp walls and corridors.",
+  "생쥐 풀어놓기": "Let the mice out",
+  "태어남에 7을 더하면 미로의 복도를 달리는 '생쥐'가 생겨요.": "Add 7 to Born and 'mice' appear, running along the maze's corridors.",
+  "곧은 복도": "Straight corridors",
+  "살아남음에서 5를 빼면 복도가 더 길고 곧게 뻗어요.": "Take 5 out of Survive and the corridors run longer and straighter.",
+  "브라이언의 뇌": "Brian's Brain",
+  "브라이언 실버먼, 1990년대": "Brian Silverman, 1990s",
+  "켜짐, 꺼지는 중, 꺼짐. 세 상태가 꼬리를 끌며 날아다녀요.": "On, dying, off. Three states that fly around trailing tails.",
+  "브라이언 실버먼이 1990년대 중반에 만든 규칙으로, 씨앗과 닮았지만 상태가 하나 더 있어요. 켜진 칸은 다음 세대에 '꺼지는 중'이 되었다가 꺼지고, 꺼지는 중인 칸은 이웃으로 세지 않아요.":
+    "Brian Silverman made it in the mid-1990s. It's like Seeds with one more state: an on cell becomes 'dying' in the next generation and then turns off, and dying cells don't count as neighbors.",
+  "신경 세포에 빗대면 신호를 보내고, 쉬고, 다시 준비하는 셈이에요. 꺼지는 칸이 뒤에 남아 방향을 만들기 때문에 거의 모든 무늬가 어딘가로 날아가요.":
+    "Think of nerve cells: they fire, rest, and get ready again. Dying cells are left behind and give each pattern a direction, so almost every pattern flies off somewhere.",
+  "켜진 네 칸": "Four on cells",
+  "켜진 칸 넷을 정사각형으로 놓으면 사방으로 끝없이 커지는 마름모가 돼요.": "Place four on cells in a square and they become a diamond that grows forever in every direction.",
+  "스타워즈": "Star Wars",
+  "미렉 보이토비치, 1999": "Mirek Wójtowicz, 1999",
+  "날아다니는 무늬가 우주 전쟁처럼 부딪히고 터져요.": "Flying patterns collide and explode like a space battle.",
+  "1999년 미렉 보이토비치가 만든 규칙이에요. 브라이언의 뇌처럼 산 이웃이 2개인 빈칸에서 태어나지만, 산 칸은 이웃이 3~5개면 버티고, 버티지 못한 칸은 두 단계에 걸쳐 사라져요.":
+    "Mirek Wójtowicz made this rule in 1999. As in Brian's Brain, an empty cell with 2 live neighbors is born, but a live cell holds on with 3 to 5 neighbors, and cells that can't hold on fade away over two steps.",
+  "우주 전쟁 장면처럼 날아다니는 무늬들이 서로 부딪히고 터진다고 붙은 이름이에요.": "It's named for its flying patterns that crash into each other and explode like a space battle scene.",
+  "브라이언의 뇌와 견주기": "Compare with Brian's Brain",
+  "버티는 조건(S345)을 지우고 상태를 셋으로 줄이면 브라이언의 뇌가 돼요.": "Remove the holding-on condition (S345) and cut the states to three, and it becomes Brian's Brain.",
+
+  // 다음 계열
+  "랭턴의 개미": "Langton's ant",
+  "크리스 랭턴, 1986": "Chris Langton, 1986",
+  "개미 한 마리가 오래 헤매다가 어느 순간 곧은 길을 내기 시작해요.": "A single ant wanders for a long time, then suddenly starts building a straight road.",
+  "1986년 크리스 랭턴이 만든 규칙이에요. 개미는 빈칸에서는 오른쪽, 칠해진 칸에서는 왼쪽으로 돌고, 밟고 있던 칸을 뒤집은 다음 한 칸 앞으로 가요.":
+    "Chris Langton created this rule in 1986. On an empty cell the ant turns right, on a colored cell it turns left; then it flips the cell it was standing on and moves forward one cell.",
+  "처음 몇백 걸음은 단정한 무늬를 그리다가, 1만 걸음 가까이 어지럽게 헤매요. 그러다 104걸음마다 같은 모양을 되풀이하는 '고속도로'를 한쪽으로 끝없이 깔아요. 지금까지 해 본 시작 모습에서는 모두 고속도로가 나왔지만, 늘 그런지는 아직 아무도 증명하지 못했어요.":
+    "For the first few hundred steps it draws neat patterns, then it wanders chaotically for nearly 10,000 steps. After that it lays a 'highway' that repeats the same shape every 104 steps and runs off in one direction forever. Every starting pattern tried so far has ended in a highway, but no one has proved that this always happens.",
+  "색 하나 더하기": "Add a color",
+  "RLR 은 끝없이 어지럽게 자라요. 고속도로가 나오는지는 아직 아무도 몰라요.": "RLR keeps growing chaotically. No one knows yet whether it ever builds a highway.",
+  "구불구불한 고속도로": "Winding highway",
+  "색이 열둘인 이 개미는 구불구불한 고속도로를 깔아요.": "This twelve-color ant lays a winding highway.",
+  "움직이는 삼각형": "Moving triangle",
+  "속이 꽉 찬 삼각형을 키우며 옮겨 가요.": "It grows a solid triangle that travels as it grows.",
+  "대칭 개미": "Symmetric ant",
+  "그렉 터크·짐 프롭": "Greg Turk & Jim Propp",
+  "이리저리 헤매는데도 그림은 늘 거울에 비춘 듯 대칭이에요.": "It wanders every which way, yet its drawing is always mirror-symmetric.",
+  "그렉 터크와 짐 프롭은 랭턴의 개미에 색을 더 늘려 보았어요. 이름의 글자가 색마다 돌 쪽을 정해요(L 왼쪽, R 오른쪽). 이 이름법으로 랭턴의 개미는 RL 이고, 이 개미는 색이 넷인 LLRR 이에요.":
+    "Greg Turk and Jim Propp tried giving Langton's ant more colors. Each letter of the name sets which way to turn on each color (L left, R right). In this naming, Langton's ant is RL, and this one is the four-color LLRR.",
+  "LL, RR 처럼 같은 글자가 둘씩 짝지어 있는 개미는 그림이 늘 대칭으로 자란다는 것이 증명되어 있어요. 개미가 어지럽게 움직이는 동안에도 대칭이 깨지지 않는지 지켜보세요.":
+    "It has been proved that when a name is made of matching pairs of letters, like LL and RR, the drawing always grows symmetrically. Watch whether the symmetry ever breaks while the ant wanders about.",
+  "짝 늘리기": "More pairs",
+  "같은 글자 짝을 더 늘린 LLRRRRLL 도 대칭으로 자라요.": "LLRRRRLL, with more pairs, grows symmetrically too.",
+  "짝 깨뜨리기": "Break the pairs",
+  "짝이 맞지 않는 RLR 은 대칭을 잃고 어지럽게 자라요.": "RLR, whose letters don't pair up, loses the symmetry and grows chaotically.",
+  "네모 개미": "Square ant",
+  "색 아홉 개로 칠하며 네모난 땅을 넓혀 가요.": "Painting with nine colors, it keeps widening a square patch.",
+  "랭턴의 개미에 색을 늘린 개미 가운데 하나로, 색이 아홉인 LRRRRRLLR 이에요. 밟은 칸의 색에 맞는 글자대로 돌고(L 왼쪽, R 오른쪽), 그 칸을 다음 색으로 바꿔요.":
+    "One of the many-colored versions of Langton's ant: the nine-color LRRRRRLLR. It turns by the letter that matches the color of the cell it's on (L left, R right), then changes that cell to the next color.",
+  "제멋대로 움직이는 것 같아도, 지나간 자리가 차츰 네모 모양으로 채워지며 커져요. 글자를 하나씩 바꿔 가며 어떤 그림이 나오는지 견주어 보세요.":
+    "It seems to move at random, but the ground it covers gradually fills in as a square that keeps growing. Change the letters one at a time and compare the drawings you get.",
+  "네모 대신 삼각형": "A triangle instead",
+  "RRLLLRLLLRRR 은 속이 꽉 찬 삼각형을 키우며 옮겨 가요.": "RRLLLRLLLRRR grows a solid triangle that travels as it grows.",
+  "규칙 30": "Rule 30",
+  "스티븐 울프럼, 1983": "Stephen Wolfram, 1983",
+  "단순한 규칙인데 무작위처럼 보이는 무늬가 쏟아져요.": "A simple rule that pours out patterns that look random.",
+  "한 줄짜리 세포 자동자예요. 칸마다 자기와 양옆, 세 칸을 보고 다음 줄의 칸을 정하고, 새 줄은 아래로 쌓여요. 1983년 스티븐 울프럼이 이런 규칙 256가지를 살피며 번호를 붙였어요.":
+    "A one-row cellular automaton. Each cell looks at three cells, itself and its two neighbors, to decide the cell below it in the next row, and new rows stack downward. In 1983 Stephen Wolfram studied all 256 rules like this and gave them numbers.",
+  "가운데 한 칸에서 시작해도 결과는 무작위와 구별하기 어려울 만큼 어지러워요. 그래서 매스매티카가 무작위 수를 만드는 데 쓰기도 했어요. 어떤 청자고둥의 껍데기 무늬와 닮았고, 영국 케임브리지 노스역 외벽에도 이 무늬가 들어가 있어요.":
+    "Even from a single cell in the middle, the result is so jumbled it's hard to tell from random. That's why Mathematica once used it to make random numbers. It resembles the pattern on a cone snail's shell, and it even decorates the outside of Cambridge North station in England.",
+  "거울에 비추기": "Mirror it",
+  "규칙 30을 좌우로 뒤집은 규칙 86이에요. 무늬도 거울에 비춘 듯 뒤집혀요.": "Rule 86 is Rule 30 flipped left to right. The pattern comes out as a mirror image.",
+  "규칙 90": "Rule 90",
+  "한 칸에서 시작하면 삼각형 속에 삼각형이 끝없이 들어차요.": "Start from one cell, and triangles nest inside triangles forever.",
+  "칸마다 양옆 두 칸만 봐요. 둘 가운데 하나만 켜져 있으면 켜지고, 둘 다 켜졌거나 둘 다 꺼졌으면 꺼져요.":
+    "Each cell looks only at its two neighbors. It turns on if exactly one of them is on, and off if both are on or both are off.",
+  "한 칸에서 시작해 생기는 그림은 시에르핀스키 삼각형이에요. 파스칼의 삼각형에서 홀수가 있는 자리만 칠한 그림과 똑같아요.":
+    "The picture that grows from a single cell is the Sierpiński triangle. It's exactly Pascal's triangle with only the odd numbers colored in.",
+  "두 칸에서 시작": "Start from two cells",
+  "켜진 칸 두 개에서 시작하면 삼각형 둘이 자라다 겹치는데, 겹친 곳은 서로 지워져요.": "Start from two on cells, and two triangles grow until they overlap. Where they overlap, they cancel out.",
+  "규칙 110": "Rule 110",
+  "한 줄짜리 규칙인데 컴퓨터처럼 계산할 수 있다고 증명됐어요.": "Just one row, yet it has been proved able to compute like a computer.",
+  "질서도 혼돈도 아닌 경계에 있는 한 줄짜리 규칙이에요. 줄이 쌓이면 작은 무늬들이 생겨 움직이다가 서로 부딪히고 모양을 바꿔요.":
+    "A one-row rule on the border between order and chaos. As rows stack up, small structures form and travel, then change shape when they collide.",
+  "1985년 스티븐 울프럼은 이 규칙으로 어떤 계산이든 할 수 있으리라 짐작했고, 그의 연구를 돕던 매슈 쿡이 이를 증명해 2004년에 발표했어요. 알맞은 바탕 무늬만 깔아 주면 컴퓨터가 하는 계산을 모두 흉내 낼 수 있다는 뜻이에요.":
+    "In 1985 Stephen Wolfram guessed that this rule could carry out any computation, and Matthew Cook, who was assisting his research, proved it and published the proof in 2004. Given the right repeating background, it can imitate any computation a computer can do.",
+  "규칙 110을 좌우로 뒤집은 규칙 124예요. 무늬가 반대쪽으로 자라요.": "Rule 124 is Rule 110 flipped left to right. The pattern grows toward the other side.",
+  "와이어월드": "Wireworld",
+  "브라이언 실버먼, 1987": "Brian Silverman, 1987",
+  "도선을 따라 전자가 흐르는, 칸으로 만든 전자 회로예요.": "Electronic circuits made of cells, with electrons flowing along wires.",
+  "1987년 브라이언 실버먼이 만들었고, 1990년 사이언티픽 아메리칸의 칼럼에 실려 널리 알려졌어요. 칸은 빈칸, 도선, 전자 머리, 전자 꼬리 넷 가운데 하나예요.":
+    "Brian Silverman created it in 1987, and it became widely known after a 1990 column in Scientific American. Each cell is one of four things: empty, wire, electron head or electron tail.",
+  "전자 머리는 다음 세대에 꼬리가 되고, 꼬리는 도선으로 돌아가요. 도선은 둘레 여덟 칸에 전자 머리가 한두 개 있으면 머리가 돼요. 이것만으로 논리 회로를 짤 수 있어서, 소수를 차례로 계산해 보여 주는 컴퓨터까지 만들어졌어요.":
+    "An electron head becomes a tail in the next generation, and a tail turns back into wire. A wire cell becomes a head when one or two of its eight neighbors are heads. That's enough to build logic circuits, and people have even built a computer that works out the prime numbers one by one and displays them.",
+  "다이오드": "Diode",
+  "전자를 한쪽으로만 보내는 부품이에요. 위쪽은 전자가 지나가고, 거꾸로 놓인 아래쪽에서는 막혀요.":
+    "A part that lets electrons through in only one direction. Electrons pass the top one, but the reversed one below blocks them.",
+
+  // 만들기 화면: 바로 써 볼 규칙과 요령
+  "2×2": "2×2",
+  "2×2 블록으로만 된 무늬는 계속 그 꼴을 지켜요.": "Patterns made only of 2×2 blocks keep that shape forever.",
+  "34 생명": "34 Life",
+  "처음에는 안정된 규칙으로 여겼지만, 큰 무늬는 결국 폭발해요.": "It was first thought to be a stable rule, but large patterns eventually explode.",
+  "죽지 않는 생명": "Life without Death",
+  "한 번 태어난 칸은 죽지 않아요. 사다리 같은 무늬가 자라요.": "Once born, a cell never dies. Ladder-like patterns grow.",
+  "모를리": "Morley",
+  "스티븐 모를리가 무늬를 많이 찾아 붙은 이름이에요. 작은 우주선이 저절로 생겨요.": "Named after Stephen Morley, who found many of its patterns. Small spaceships appear on their own.",
+  "산호": "Coral",
+  "천천히 자라며 산호 같은 결을 만들어요.": "Grows slowly into coral-like textures.",
+  "복제": "Replicator",
+  "에드워드 프레드킨의 규칙이에요. 어떤 무늬든 결국 자기 복사본 여러 개로 바뀌어요.": "Edward Fredkin's rule. Any pattern eventually turns into several copies of itself.",
+  "비우기를 누른 뒤 칸을 눌러 시작 모습을 만들고 재생해 보세요. 처음으로를 누르면 그 모습으로 돌아와요.":
+    "Press Clear, press cells to make a starting pattern, and play it. Press Reset to come back to that pattern.",
+  "태어남이 3부터 시작하는 규칙에서 재미있는 것이 많이 나왔어요. 생명 게임, 하이라이프, 낮과 밤이 모두 그래요.":
+    "Many interesting rules have Born starting at 3. The Game of Life, HighLife and Day & Night all do.",
+  "태어남에 1이나 2가 있으면 무늬가 걷잡을 수 없이 퍼지기 쉬워요. 너무 넓게 퍼지면 멈춰요.": "With 1 or 2 in Born, patterns tend to spread out of control. It stops if they spread too far.",
+  "태어남 0은 쓸 수 없어요. 끝없는 격자에서는 빈 곳이 모두 한꺼번에 태어나 버리거든요.": "Born 0 isn't allowed: on an endless grid, all the empty space would come alive at once.",
+  "살아남음에 0부터 8까지 모두 넣으면 산 칸은 죽지 않아요.": "Put every number from 0 to 8 in Survive, and live cells never die.",
+  "상태 수를 3 이상으로 올리면 죽는 칸이 몇 세대 동안 꼬리처럼 남아요.": "Raise the number of states to 3 or more, and dying cells linger like tails for a few generations.",
+
+  // ── core/rules.js: 규칙 파일 검사 ─────────────────────────────
+  "규칙 파일은 { } 로 감싼 JSON 이어야 해요": "A rule file must be JSON wrapped in { }",
+  "family: 아직 돌릴 수 없는 계열이에요 ({f})": "family: this family can't run yet ({f})",
+  "states: 상태는 {min}–{max}개여야 해요": "states: there must be {min}–{max} states",
+  "states[{i}]: name 글이 있어야 해요": "states[{i}]: needs a name",
+  "states[{i}]: color 는 #rrggbb 꼴이어야 해요": "states[{i}]: color must look like #rrggbb",
+  "rule.birth: 0–8 사이 정수의 배열이어야 해요": "rule.birth: must be an array of integers from 0 to 8",
+  "rule.birth: 끝없는 격자에서는 0을 쓸 수 없어요": "rule.birth: 0 can't be used on an endless grid",
+  "rule.survive: 0–8 사이 정수의 배열이어야 해요": "rule.survive: must be an array of integers from 0 to 8",
+  "neighborhood: 지금은 moore 만 돼요": "neighborhood: only moore works for now",
+  "grid.edges: infinite·wrap·wall 가운데 하나여야 해요": "grid.edges: must be infinite, wrap or wall",
+  "grid.edges: Life 계열은 끝없는 격자(infinite)에서 돌아가요": "grid.edges: Life-family rules run on the endless grid (infinite)",
+  "grid.width·height: 끝없는 격자에는 크기를 적지 않아요": "grid.width·height: an endless grid has no size",
+  "grid.width: 3–2000 사이 정수여야 해요": "grid.width: must be an integer from 3 to 2000",
+  "grid.height: 3–2000 사이 정수여야 해요": "grid.height: must be an integer from 3 to 2000",
+  "seed.type: empty·random·single·rle 가운데 하나여야 해요": "seed.type: must be empty, random, single or rle",
+  "seed.density: 0–1 사이 수여야 해요": "seed.density: must be a number from 0 to 1",
+  "seed.area: 0보다 크고 1 이하인 수여야 해요": "seed.area: must be a number greater than 0 and no more than 1",
+  "seed.data: RLE 글이 있어야 해요": "seed.data: needs RLE text",
+  "이름 없는 규칙": "Untitled rule",
+  "빈칸": "Empty",
+  "사라지는 칸 {k}": "Dying {k}",
+
+  // ── index.html 의 고정 글: 화면이 t() 로 붙이면 쓰인다 ─────────────────────────────
+  "본문으로 건너뛰기": "Skip to content",
+  "Grid Game 첫 화면": "Grid Game home",
+  "주 메뉴": "Main menu",
+  "만들기": "Make",
+  "화면 밝기 바꾸기": "Change theme",
+  "불러오는 중이에요…": "Loading…",
+  "Grid Game. 설정은 이 브라우저에만 남아요.": "Grid Game. Your settings stay in this browser only.",
+  "만든 사람과 출처": "Credits and sources",
+
+  // ── 규칙 파일의 이름·상태 이름(web/data/rules) ─────────────────────────────
+  "콘웨이의 생명 게임": "Conway's Game of Life",
+  "켜짐": "On",
+  "꺼짐": "Off",
+  "꺼지는 중": "Dying",
+  "사라지는 칸 1": "Dying 1",
+  "사라지는 칸 2": "Dying 2",
+};

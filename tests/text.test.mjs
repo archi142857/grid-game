@@ -1,4 +1,4 @@
-// node --test 로 돈다. 화면 글: 조사, 틀 자리표, 규칙 설명, 규칙 파일 꼴, 도감 글.
+// node --test 로 돈다. 화면 글: 조사, 틀 자리표, 규칙 설명, 규칙 파일 꼴, 도감 글, 영어 사전.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -6,7 +6,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { josa } from "../web/js/core/josa.js";
-import { t } from "../web/js/i18n.js";
+import { t, setLang } from "../web/js/i18n.js";
+import { EN } from "../web/js/i18n/en.js";
 import { formatRuleFile } from "../web/js/core/rules.js";
 import { ranges, describeRule } from "../web/js/ui/rulepad.js";
 import { MORE_RULES, entryOf, catalogIds } from "../web/js/data/catalog.js";
@@ -15,6 +16,8 @@ import { checkRuleFile } from "../web/js/core/rules.js";
 import { parseRLE } from "../web/js/core/rle.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const jsFiles = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? jsFiles(join(dir, d.name)) : d.name.endsWith(".js") ? [join(dir, d.name)] : []));
 
 test("조사: 숫자는 읽는 소리로, 한글은 받침으로", () => {
   const cases = [
@@ -42,9 +45,61 @@ test("틀 자리표: 값과 조사", () => {
 });
 
 test("t() 의 열쇠는 따옴표 글이다(영어판을 붙일 때 찾을 수 있게)", () => {
-  const walk = (dir) =>
-    readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? walk(join(dir, d.name)) : d.name.endsWith(".js") ? [join(dir, d.name)] : []));
-  for (const f of walk(join(ROOT, "web/js"))) assert.ok(!/\bt\(\s*`/.test(readFileSync(f, "utf8")), f);
+  for (const f of jsFiles(join(ROOT, "web/js"))) assert.ok(!/\bt\(\s*`/.test(readFileSync(f, "utf8")), f);
+});
+
+/** 화면 글의 열쇠: web/js 의 t("…")(설명 줄은 빼고)와 도감 규칙 파일의 이름·상태 이름(화면이 t() 로 감싸 부른다) */
+function screenKeys() {
+  const keys = new Set();
+  for (const f of jsFiles(join(ROOT, "web/js"))) {
+    if (f.endsWith(join("i18n", "en.js"))) continue;
+    // 줄 설명을 먼저 지운다(설명 속 "rules/*.json" 같은 글이 블록 설명의 시작으로 읽히지 않게)
+    const src = readFileSync(f, "utf8")
+      .replace(/^\s*\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const m of src.matchAll(/(?<![\w$.])t\(\s*"((?:[^"\\]|\\.)*)"/g)) keys.add(JSON.parse(`"${m[1]}"`));
+  }
+  const dir = join(ROOT, "web/data/rules");
+  for (const id of JSON.parse(readFileSync(join(dir, "index.json"), "utf8"))) {
+    const file = JSON.parse(readFileSync(join(dir, `${id}.json`), "utf8"));
+    keys.add(file.name);
+    for (const s of file.states) keys.add(s.name);
+  }
+  return keys;
+}
+
+/** 틀의 자리표 이름. {n}, {n:이가}, {n|one|many} 는 모두 n */
+const slots = (tpl) => [...new Set([...tpl.matchAll(/\{(\w+)(?::[가-힣]+|\|[^|}]*\|[^}]*)?\}/g)].map((m) => m[1]))].sort();
+
+test("영어 사전: 자리표가 한국어 틀과 같고, 한글이 남지 않는다", (tt) => {
+  for (const [ko, en] of Object.entries(EN)) {
+    if (typeof en === "function") continue;
+    assert.equal(typeof en, "string", ko);
+    assert.ok(!/[가-힣]/.test(en), `한글이 남았어요: ${en}`);
+    assert.ok(!/\{\w+:/.test(en), `영어에는 조사 자리표를 쓰지 않아요: ${en}`);
+    assert.deepEqual(slots(en), slots(ko), `자리표가 달라요: ${ko} → ${en}`);
+  }
+  // 다른 세션이 화면 글을 고쳐도 main 이 막히지 않게, 빠진 글과 안 쓰는 열쇠는 알림으로만 띄운다
+  const keys = screenKeys();
+  const stale = Object.keys(EN).filter((k) => !keys.has(k));
+  const missing = [...keys].filter((k) => !(k in EN));
+  if (stale.length) tt.diagnostic(`영어 사전에만 있는 열쇠 ${stale.length}개: ${stale.slice(0, 8).join(" | ")}`);
+  if (missing.length) tt.diagnostic(`영어가 없는 화면 글 ${missing.length}개: ${missing.slice(0, 8).join(" | ")}`);
+});
+
+test("영어 틀: 값, 단수·복수, 사전에 없는 글", () => {
+  const st = (n) => Array.from({ length: n }, () => ({ name: "x" }));
+  setLang("en");
+  try {
+    assert.equal(t("산 이웃 {n}개라서", { n: 1 }), "1 live neighbor, so it");
+    assert.equal(t("산 이웃 {n}개라서", { n: 3 }), "3 live neighbors, so it");
+    assert.equal(t("태어남에 {n:이가} 있어요", { n: 2 }), "Born includes 2");
+    assert.equal(t("사전에 없는 글"), "사전에 없는 글", "사전에 없으면 한국어 그대로");
+    assert.equal(describeRule({ birth: [3], survive: [2, 3], states: st(2) }), "An empty cell is born with 3 live neighbors, and a live cell survives with 2, 3.");
+    assert.equal(describeRule({ birth: [1], survive: [], states: st(3) }).startsWith("An empty cell is born with 1 live neighbor, and live cells start fading"), true);
+  } finally {
+    setLang("ko");
+  }
 });
 
 test("숫자 묶음은 이어진 셋 이상만 물결표로", () => {
