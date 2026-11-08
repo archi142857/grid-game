@@ -17,14 +17,15 @@ const ENTRIES = {
       ),
     ],
     watch: () => [
-      { kind: "pattern", name: t("글라이더"), text: t("다섯 칸이 네 세대마다 대각선으로 한 칸씩 기어가요."), rle: "bo$2bo$3o!" },
+      { kind: "pattern", pattern: "glider", name: t("글라이더"), text: t("다섯 칸이 네 세대마다 대각선으로 한 칸씩 기어가요."), rle: "bo$2bo$3o!" },
       {
         kind: "pattern",
+        pattern: "gosper-glider-gun",
         name: t("고스퍼 글라이더 총"),
         text: t("1970년 빌 고스퍼가 찾았어요. 30세대마다 글라이더를 하나씩 쏘아 내요."),
         rle: "24bo$22bobo$12b2o6b2o12b2o$11bo3bo4b2o12b2o$2o8bo5bo3b2o$2o8bo3bob2o4bobo$10bo5bo7bo$11bo3bo$12b2o!",
       },
-      { kind: "pattern", name: t("R-펜토미노"), text: t("다섯 칸에서 시작해 1103세대가 지나서야 잠잠해져요. 날아가는 글라이더도 끌어서 따라가 보세요."), rle: "b2o$2o$bo!" },
+      { kind: "pattern", pattern: "r-pentomino", name: t("R-펜토미노"), text: t("다섯 칸에서 시작해 1103세대가 지나서야 잠잠해져요. 날아가는 글라이더도 끌어서 따라가 보세요."), rle: "b2o$2o$bo!" },
       { kind: "rule", name: t("태어남에 6 더하기"), text: t("숫자 하나만 더해도 스스로를 복제하는 무늬가 사는 하이라이프가 돼요."), notation: "B36/S23" },
     ],
   },
@@ -39,12 +40,14 @@ const ENTRIES = {
     watch: () => [
       {
         kind: "pattern",
+        pattern: "replicator",
         name: t("복제자"),
         text: t("12세대 뒤에 똑같은 무늬가 둘이 되고, 계속 늘어나며 대각선으로 줄지어 퍼져요."),
         rle: "2b3o$bo2bo$o3bo$o2bo$3o!",
       },
       {
         kind: "pattern",
+        pattern: "bomber",
         name: t("폭격기"),
         text: t("복제자가 깜빡이를 끌고 가며 48세대마다 대각선으로 8칸씩 나아가요."),
         rle: "bo$bo$bo3$3bo$2b2o$bobo$3o2$6b3o$5bobo$5b2o$5bo!",
@@ -60,7 +63,7 @@ const ENTRIES = {
       t("그런데도 거의 모든 무늬가 폭발하듯 퍼져 나가요. 가운데의 작은 씨앗이 끝없이 번져 나가는 모습을 보세요. 너무 넓게 퍼지면 멈춰요."),
     ],
     watch: () => [
-      { kind: "pattern", name: t("네 칸"), text: t("정사각형 네 칸이 폭발하듯 퍼져 나가요."), rle: "2o$2o!" },
+      { kind: "pattern", pattern: "seeds-square", name: t("네 칸"), text: t("정사각형 네 칸이 폭발하듯 퍼져 나가요."), rle: "2o$2o!" },
       {
         kind: "rule",
         name: t("한 세대 쉬어 가기"),
@@ -105,7 +108,7 @@ const ENTRIES = {
       ),
       t("신경 세포에 빗대면 신호를 보내고, 쉬고, 다시 준비하는 셈이에요. 꺼지는 칸이 뒤에 남아 방향을 만들기 때문에 거의 모든 무늬가 어딘가로 날아가요."),
     ],
-    watch: () => [{ kind: "pattern", name: t("켜진 네 칸"), text: t("켜진 칸 넷을 정사각형으로 놓으면 사방으로 끝없이 커지는 마름모가 돼요."), rle: "2o$2o!" }],
+    watch: () => [{ kind: "pattern", pattern: "brians-brain-square", name: t("켜진 네 칸"), text: t("켜진 칸 넷을 정사각형으로 놓으면 사방으로 끝없이 커지는 마름모가 돼요."), rle: "2o$2o!" }],
   },
   "star-wars": {
     short: () => t("스타워즈"),
@@ -171,6 +174,18 @@ const ENTRIES = {
     ],
     watch: () => [{ kind: "rule", name: t("네모 대신 삼각형"), text: t("RRLLLRLLLRRR 은 속이 꽉 찬 삼각형을 키우며 옮겨 가요."), notation: "RRLLLRLLLRRR" }],
   },
+  "fibonacci-turmite": {
+    short: () => t("피보나치 나선"),
+    credit: null,
+    tag: () => t("속 상태가 둘인 개미가 빈 판에 피보나치 나선을 그려 나가요."),
+    about: () => [
+      t(
+        "랭턴의 개미는 밟은 칸의 색만 보지만, 터마이트는 자기 '속 상태'도 함께 봐요. 칸 색과 속 상태에 따라 칠할 색, 돌 쪽, 다음 속 상태가 정해져요. 1989년 A. K. 듀드니가 그렉 터크의 연구를 칼럼에 소개하며 '터마이트'라는 이름을 붙였어요.",
+      ),
+      t("이 터마이트는 속 상태 둘, 칸 색 둘만으로 빈 판에서 피보나치 나선을 그려요. 한 변이 1, 1, 2, 3, 5…처럼 앞의 두 수를 더한 길이로 커지는 네모를 돌려 붙인 나선이에요."),
+    ],
+    watch: () => [],
+  },
   "rule-30": {
     short: () => t("규칙 30"),
     credit: () => t("스티븐 울프럼, 1983"),
@@ -227,6 +242,7 @@ const ENTRIES = {
     watch: () => [
       {
         kind: "pattern",
+        pattern: "wireworld-diode",
         name: t("다이오드"),
         text: t("전자를 한쪽으로만 보내는 부품이에요. 위쪽은 전자가 지나가고, 거꾸로 놓인 아래쪽에서는 막혀요."),
         rle: "16.2C$CBA3CBA3CBA4C.10C$16.2C2$16.2C$CBA3CBA3CBA3C.11C$16.2C!",
@@ -237,6 +253,36 @@ const ENTRIES = {
 
 /** 도감 글이 있는 규칙 id 전부(규칙 파일보다 먼저 들어온 다음 계열 글까지) */
 export const catalogIds = () => Object.keys(ENTRIES);
+
+// ── 무늬 모음(web/data/patterns)의 이름과 설명. 열쇠는 무늬 id ─────────────────
+// 볼 것의 무늬도 같은 id 를 pattern 으로 적어 둔다(같은 글이라 영어도 하나로 쓴다).
+
+const PATTERNS = {
+  glider: { name: () => t("글라이더"), text: () => t("다섯 칸이 네 세대마다 대각선으로 한 칸씩 기어가요.") },
+  lwss: { name: () => t("가벼운 우주선"), text: () => t("네 세대마다 옆으로 두 칸씩 날아가는 우주선이에요.") },
+  pulsar: { name: () => t("펄서"), text: () => t("세 세대마다 처음 모습으로 돌아오며 맥박처럼 뛰어요.") },
+  pentadecathlon: { name: () => t("펜타데카슬론"), text: () => t("15세대마다 처음 모습으로 돌아와요. 이름도 '열다섯 종목 경기'라는 뜻이에요.") },
+  "gosper-glider-gun": { name: () => t("고스퍼 글라이더 총"), text: () => t("1970년 빌 고스퍼가 찾았어요. 30세대마다 글라이더를 하나씩 쏘아 내요.") },
+  "r-pentomino": {
+    name: () => t("R-펜토미노"),
+    text: () => t("다섯 칸에서 시작해 1103세대가 지나서야 잠잠해져요. 날아가는 글라이더도 끌어서 따라가 보세요."),
+  },
+  acorn: { name: () => t("도토리"), text: () => t("찰스 코더먼이 찾은 일곱 칸이에요. 5206세대가 지나서야 잠잠해지고, 그때 산 칸이 633개예요.") },
+  diehard: { name: () => t("다이하드"), text: () => t("일곱 칸이 130세대 동안 요동치다가 하나도 남김없이 사라져요.") },
+  replicator: { name: () => t("복제자"), text: () => t("12세대 뒤에 똑같은 무늬가 둘이 되고, 계속 늘어나며 대각선으로 줄지어 퍼져요.") },
+  bomber: { name: () => t("폭격기"), text: () => t("복제자가 깜빡이를 끌고 가며 48세대마다 대각선으로 8칸씩 나아가요.") },
+  "seeds-square": { name: () => t("네 칸"), text: () => t("정사각형 네 칸이 폭발하듯 퍼져 나가요.") },
+  "brians-brain-square": { name: () => t("켜진 네 칸"), text: () => t("켜진 칸 넷을 정사각형으로 놓으면 사방으로 끝없이 커지는 마름모가 돼요.") },
+  "wireworld-clock": { name: () => t("시계"), text: () => t("여덟 칸 고리를 도는 전자가 8세대마다 하나씩 도선으로 나가요.") },
+  "wireworld-diode": {
+    name: () => t("다이오드"),
+    text: () => t("전자를 한쪽으로만 보내는 부품이에요. 위쪽은 전자가 지나가고, 거꾸로 놓인 아래쪽에서는 막혀요."),
+  },
+};
+
+/** 무늬 id → { name(), text() } | null */
+export const patternOf = (id) => PATTERNS[id] ?? null;
+export const patternIds = () => Object.keys(PATTERNS);
 
 export const entryOf = (id) => ENTRIES[id] ?? null;
 export const shortName = (rule) => ENTRIES[rule.id]?.short() ?? rule.name;

@@ -324,6 +324,12 @@ export const EN = {
     "It seems to move at random, but the ground it covers gradually fills in as a square that keeps growing. Change the letters one at a time and compare the drawings you get.",
   "네모 대신 삼각형": "A triangle instead",
   "RRLLLRLLLRRR 은 속이 꽉 찬 삼각형을 키우며 옮겨 가요.": "RRLLLRLLLRRR grows a solid triangle that travels as it grows.",
+  "피보나치 나선": "Fibonacci spiral",
+  "속 상태가 둘인 개미가 빈 판에 피보나치 나선을 그려 나가요.": "An ant with two inner states draws a Fibonacci spiral on an empty grid.",
+  "랭턴의 개미는 밟은 칸의 색만 보지만, 터마이트는 자기 '속 상태'도 함께 봐요. 칸 색과 속 상태에 따라 칠할 색, 돌 쪽, 다음 속 상태가 정해져요. 1989년 A. K. 듀드니가 그렉 터크의 연구를 칼럼에 소개하며 '터마이트'라는 이름을 붙였어요.":
+    "Langton's ant looks only at the color of the cell it's on, but a turmite also looks at its own 'inner state'. Together, the cell color and the inner state decide which color to paint, which way to turn, and the next inner state. In 1989 A. K. Dewdney introduced Greg Turk's work in his column and gave these creatures the name 'turmites'.",
+  "이 터마이트는 속 상태 둘, 칸 색 둘만으로 빈 판에서 피보나치 나선을 그려요. 한 변이 1, 1, 2, 3, 5…처럼 앞의 두 수를 더한 길이로 커지는 네모를 돌려 붙인 나선이에요.":
+    "With just two inner states and two cell colors, this turmite draws a Fibonacci spiral on an empty grid: a spiral of squares whose sides grow 1, 1, 2, 3, 5…, each the sum of the two before.",
   "규칙 30": "Rule 30",
   "스티븐 울프럼, 1983": "Stephen Wolfram, 1983",
   "단순한 규칙인데 무작위처럼 보이는 무늬가 쏟아져요.": "A simple rule that pours out patterns that look random.",
@@ -358,6 +364,21 @@ export const EN = {
   "다이오드": "Diode",
   "전자를 한쪽으로만 보내는 부품이에요. 위쪽은 전자가 지나가고, 거꾸로 놓인 아래쪽에서는 막혀요.":
     "A part that lets electrons through in only one direction. Electrons pass the top one, but the reversed one below blocks them.",
+
+  // 무늬 모음
+  "가벼운 우주선": "Lightweight spaceship",
+  "네 세대마다 옆으로 두 칸씩 날아가는 우주선이에요.": "A spaceship that flies two cells sideways every four generations.",
+  "펄서": "Pulsar",
+  "세 세대마다 처음 모습으로 돌아오며 맥박처럼 뛰어요.": "It returns to its starting shape every three generations, beating like a pulse.",
+  "펜타데카슬론": "Pentadecathlon",
+  "15세대마다 처음 모습으로 돌아와요. 이름도 '열다섯 종목 경기'라는 뜻이에요.": "It returns to its starting shape every 15 generations. Its name means 'contest of fifteen events'.",
+  "도토리": "Acorn",
+  "찰스 코더먼이 찾은 일곱 칸이에요. 5206세대가 지나서야 잠잠해지고, 그때 산 칸이 633개예요.":
+    "Seven cells found by Charles Corderman. It takes 5206 generations to settle down, ending with 633 live cells.",
+  "다이하드": "Diehard",
+  "일곱 칸이 130세대 동안 요동치다가 하나도 남김없이 사라져요.": "Seven cells that churn for 130 generations and then vanish completely.",
+  "시계": "Clock",
+  "여덟 칸 고리를 도는 전자가 8세대마다 하나씩 도선으로 나가요.": "An electron circling an eight-cell loop sends one electron down the wire every 8 generations.",
 
   // 만들기 화면: 바로 써 볼 규칙과 요령
   "2×2": "2×2",
@@ -394,15 +415,34 @@ export const EN = {
   "grid.edges: infinite·wrap·wall 가운데 하나여야 해요": "grid.edges: must be infinite, wrap or wall",
   "grid.edges: Life 계열은 끝없는 격자(infinite)에서 돌아가요": "grid.edges: Life-family rules run on the endless grid (infinite)",
   "grid.width·height: 끝없는 격자에는 크기를 적지 않아요": "grid.width·height: an endless grid has no size",
-  "grid.width: 3–2000 사이 정수여야 해요": "grid.width: must be an integer from 3 to 2000",
-  "grid.height: 3–2000 사이 정수여야 해요": "grid.height: must be an integer from 3 to 2000",
+  "grid.edges: 지금은 끝없는 격자(infinite)에서만 돌아가요": "grid.edges: only the endless grid (infinite) works for now",
   "seed.type: empty·random·single·rle 가운데 하나여야 해요": "seed.type: must be empty, random, single or rle",
   "seed.density: 0–1 사이 수여야 해요": "seed.density: must be a number from 0 to 1",
   "seed.area: 0보다 크고 1 이하인 수여야 해요": "seed.area: must be a number greater than 0 and no more than 1",
   "seed.data: RLE 글이 있어야 해요": "seed.data: needs RLE text",
+  "states: 이 계열은 상태가 {n}개예요": "states: this family has {n} states",
+  "rule: turns 와 machine 가운데 하나만 적어요": "rule: use only one of turns and machine",
+  "rule: 개미는 turns, 터마이트는 machine 을 적어요": "rule: ants use turns, turmites use machine",
+  "rule.turns: 칸 색마다 L·R·N·U 가운데 한 글자씩, 상태 수만큼 적어요": "rule.turns: one letter of L, R, N or U for each cell color, as many as there are states",
+  "rule.machine: [개미 상태][칸 색] = [쓸 색, 회전 글자, 다음 개미 상태] 꼴이어야 해요":
+    "rule.machine: must have the form [ant state][cell color] = [color to write, turn letter, next ant state]",
+  "agents: 개미는 {max}마리까지 배열로 적어요": "agents: list up to {max} ants in an array",
+  "agents[{i}]: x·y 는 정수, dir 은 N·E·S·W 가운데 하나여야 해요": "agents[{i}]: x and y must be integers, and dir one of N, E, S or W",
+  "rule.number: 0–255 사이 정수여야 해요": "rule.number: must be an integer from 0 to 255",
+  "rule.number: 끝없는 격자에서는 홀수 번호(000 → 1)를 쓸 수 없어요": "rule.number: odd numbers (000 → 1) can't be used on an endless grid",
+  "rule.transitions: 줄을 {max}개까지 배열로 적어요": "rule.transitions: list up to {max} lines in an array",
+  "rule.transitions[{i}]: from·to 는 상태 번호, when 은 { state, count } 꼴이어야 해요":
+    "rule.transitions[{i}]: from and to must be state numbers, and when must look like { state, count }",
+  "rule.transitions[{i}]: 빈칸(0)은 셀 수 없어요": "rule.transitions[{i}]: empty cells (0) can't be counted",
+  "rule.transitions: 세는 상태는 {max}가지까지예요": "rule.transitions: you can count up to {max} kinds of state",
+  "rule.transitions: 끝없는 격자에서는 이웃이 없는 빈칸이 바뀌는 줄을 쓸 수 없어요":
+    "rule.transitions: on an endless grid, no line may change an empty cell with no neighbors",
   "이름 없는 규칙": "Untitled rule",
   "빈칸": "Empty",
   "사라지는 칸 {k}": "Dying {k}",
+  "색 {k}": "Color {k}",
+  "켜진 칸": "On",
+  "상태 {k}": "State {k}",
 
   // ── index.html 의 고정 글: 화면이 t() 로 붙이면 쓰인다 ─────────────────────────────
   "본문으로 건너뛰기": "Skip to content",
@@ -421,4 +461,54 @@ export const EN = {
   "꺼지는 중": "Dying",
   "사라지는 칸 1": "Dying 1",
   "사라지는 칸 2": "Dying 2",
+  "LLRR 개미": "LLRR ant",
+  "LRRRRRLLR 개미": "LRRRRRLLR ant",
+  "피보나치 나선 터마이트": "Fibonacci spiral turmite",
+  "칠한 칸": "Painted",
+  "색 1": "Color 1",
+  "색 2": "Color 2",
+  "색 3": "Color 3",
+  "색 4": "Color 4",
+  "색 5": "Color 5",
+  "색 6": "Color 6",
+  "색 7": "Color 7",
+  "색 8": "Color 8",
+  "전자 머리": "Electron head",
+  "전자 꼬리": "Electron tail",
+  "도선": "Wire",
+
+  // ── data/challenges.js: 도전 과제 ─────────────────────────────
+  "멈춘 무늬": "Still life",
+  "생명 게임에서 칸을 {min}개 이상 놓아, 다음 세대에도 모습이 그대로인 무늬를 만들어 보세요.":
+    "In the Game of Life, place at least {min} cells to make a pattern that stays exactly the same in the next generation.",
+  "산 칸은 모두 산 이웃이 2개나 3개여야 하고, 산 이웃이 꼭 3개인 빈칸은 없어야 해요.": "Every live cell needs 2 or 3 live neighbors, and no empty cell may have exactly 3.",
+  "깜빡이는 무늬": "Blinking pattern",
+  "{w}×{h} 네모 안에 칸을 놓아, 두 세대마다 처음 모습으로 돌아오는 무늬를 만들어 보세요.":
+    "Place cells inside a {w}×{h} box to make a pattern that returns to its starting shape every two generations.",
+  "가장 작은 답은 칸 세 개짜리예요.": "The smallest answer uses just three cells.",
+  "세 박자 무늬": "Three-beat pattern",
+  "{w}×{h} 네모 안에 칸을 놓아, 세 세대마다 처음 모습으로 돌아오는 무늬를 만들어 보세요.":
+    "Place cells inside a {w}×{h} box to make a pattern that returns to its starting shape every three generations.",
+  "위아래와 좌우가 똑같은 모양에서 찾아보세요. 가장 이름난 답은 펄서예요.": "Look among shapes that match top to bottom and left to right. The most famous answer is the pulsar.",
+  "날아가는 무늬": "Flying pattern",
+  "칸을 {cells}개까지만 놓아, 같은 모양을 지키며 자리를 옮겨 가는 무늬를 만들어 보세요.":
+    "Place no more than {cells} {cells|cell|cells} to make a pattern that keeps its shape while moving to a new spot.",
+  "칸 다섯 개로 대각선으로 기어가는 무늬가 있어요.": "There's a five-cell pattern that crawls diagonally.",
+  "오래 버티기": "Stay alive",
+  "칸을 {cells}개까지만 놓아, {gens}세대가 지나도 산 칸이 남아 있게 해 보세요.":
+    "Place no more than {cells} {cells|cell|cells} so that some cells are still alive after {gens} generations.",
+  "작은 무늬가 오래 요동치기도 해요. 다섯 칸짜리 R-펜토미노는 1103세대가 지나서야 잠잠해져요.":
+    "Small patterns can churn for a long time. The five-cell R-pentomino doesn't settle down until generation 1103.",
+  "스스로 늘어나기": "Multiply",
+  "하이라이프(B36/S23)에서 칸을 {cells}개까지만 놓아, {gens}세대 뒤에 산 칸이 {min}개 이상이 되게 해 보세요.":
+    "In HighLife (B36/S23), place no more than {cells} {cells|cell|cells} so that at least {min} cells are alive after {gens} generations.",
+  "하이라이프에는 12세대마다 자기와 똑같은 무늬를 하나씩 더 만드는 복제자가 있어요.": "HighLife has a replicator that makes one more copy of itself every 12 generations.",
+  "삼각형 속 삼각형": "Triangles in triangles",
+  "가운데 한 칸에서 시작해 {gens}줄 동안 시에르핀스키 삼각형을 그리는 1차원 규칙 번호를 찾아보세요.":
+    "Starting from a single cell in the middle, find the one-row rule number that draws the Sierpiński triangle for {gens} rows.",
+  "가운데 칸은 보지 말고, 양옆 두 칸만 보고 정해 보세요.": "Ignore the middle cell and decide using only the two neighbors.",
+  "규칙 맞히기": "Guess the rule",
+  "보기 무늬가 {gens}세대 동안 똑같이 흘러가는 규칙을 태어남·살아남음 숫자로 맞혀 보세요.":
+    "Find the Born and Survive numbers that make the example pattern unfold exactly the same way for {gens} generations.",
+  "한 세대씩 넘기며, 빈칸이 산 이웃 몇 개에서 태어나는지부터 세어 보세요.": "Step one generation at a time, and start by counting how many live neighbors an empty cell has when it's born.",
 };

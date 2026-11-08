@@ -10,7 +10,8 @@ import { t, setLang } from "../web/js/i18n.js";
 import { EN } from "../web/js/i18n/en.js";
 import { formatRuleFile } from "../web/js/core/rules.js";
 import { ranges, describeRule } from "../web/js/ui/rulepad.js";
-import { MORE_RULES, entryOf, catalogIds } from "../web/js/data/catalog.js";
+import { MORE_RULES, entryOf, catalogIds, patternOf, patternIds } from "../web/js/data/catalog.js";
+import { challengeOf, challengeIds } from "../web/js/data/challenges.js";
 import { parseNotation } from "../web/js/core/life.js";
 import { checkRuleFile } from "../web/js/core/rules.js";
 import { parseRLE } from "../web/js/core/rle.js";
@@ -59,11 +60,13 @@ function screenKeys() {
       .replace(/\/\*[\s\S]*?\*\//g, "");
     for (const m of src.matchAll(/(?<![\w$.])t\(\s*"((?:[^"\\]|\\.)*)"/g)) keys.add(JSON.parse(`"${m[1]}"`));
   }
+  // 규칙 파일은 도감 목록에 아직 없는 것(다음 계열)까지 본다
   const dir = join(ROOT, "web/data/rules");
-  for (const id of JSON.parse(readFileSync(join(dir, "index.json"), "utf8"))) {
-    const file = JSON.parse(readFileSync(join(dir, `${id}.json`), "utf8"));
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".json") || name === "index.json") continue;
+    const file = JSON.parse(readFileSync(join(dir, name), "utf8"));
     keys.add(file.name);
-    for (const s of file.states) keys.add(s.name);
+    for (const s of file.states ?? []) keys.add(s.name);
   }
   return keys;
 }
@@ -168,4 +171,41 @@ test("도감 규칙마다 도감 글이 있고, 볼 것의 무늬·표기는 읽
     }
   }
   for (const r of MORE_RULES()) assert.ok(parseNotation(r.notation), r.notation);
+});
+
+test("무늬 모음: 무늬마다 이름·설명이 있고, 볼 것의 무늬는 무늬 파일과 같다", (tt) => {
+  for (const id of patternIds()) assert.ok(patternOf(id).name() && patternOf(id).text(), id);
+  // 무늬 파일은 엔진 몫이라, 어긋남은 main 을 막지 않고 알림으로 띄운다
+  const dir = join(ROOT, "web/data/patterns");
+  const listed = existsSync(join(dir, "index.json")) ? JSON.parse(readFileSync(join(dir, "index.json"), "utf8")).map((p) => p.id) : [];
+  const noText = listed.filter((id) => !patternOf(id));
+  if (noText.length) tt.diagnostic(`이름·설명이 없는 무늬: ${noText.join(", ")}`);
+  const drift = [];
+  for (const id of catalogIds())
+    for (const w of entryOf(id).watch()) {
+      if (!w.pattern) continue;
+      const file = join(dir, `${w.pattern}.rle`);
+      if (!existsSync(file)) drift.push(`${id} → ${w.pattern}(파일 없음)`);
+      else if (JSON.stringify(parseRLE(readFileSync(file, "utf8")).rows) !== JSON.stringify(parseRLE(w.rle).rows)) drift.push(`${id} → ${w.pattern}(RLE 다름)`);
+    }
+  if (drift.length) tt.diagnostic(`볼 것과 무늬 파일이 어긋남: ${drift.join(" | ")}`);
+});
+
+test("도전 과제: 문제마다 제목·할 일·힌트가 있고, 할 일의 자리표가 다 채워진다", (tt) => {
+  const sample = { limits: { cells: 5, minCells: 6, box: [8, 8] }, goal: { gens: 1000, min: 100, p: 2 } };
+  for (const id of challengeIds()) {
+    const c = challengeOf(id);
+    assert.ok(c.title() && c.hint(), id);
+    assert.ok(!/\{\w+\}/.test(c.task(sample)), `${id}: ${c.task(sample)}`);
+  }
+  // 문제 파일(엔진)이 생기면 실제 값으로도 본다. 어긋남은 알림으로
+  const file = join(ROOT, "web/data/challenges/index.json");
+  if (!existsSync(file)) return;
+  const list = JSON.parse(readFileSync(file, "utf8"));
+  const problems = (Array.isArray(list) ? list : list.challenges ?? []).flatMap((ch) => {
+    const c = challengeOf(ch.id);
+    if (!c) return [`${ch.id}(글 없음)`];
+    return /\{\w+\}/.test(c.task(ch)) ? [`${ch.id}(빈 자리표: ${c.task(ch)})`] : [];
+  });
+  if (problems.length) tt.diagnostic(`도전 과제 글 확인: ${problems.join(" | ")}`);
 });
