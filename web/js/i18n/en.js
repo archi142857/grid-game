@@ -354,6 +354,13 @@ export const EN = {
   "1985년 스티븐 울프럼은 이 규칙으로 어떤 계산이든 할 수 있으리라 짐작했고, 그의 연구를 돕던 매슈 쿡이 이를 증명해 2004년에 발표했어요. 알맞은 바탕 무늬만 깔아 주면 컴퓨터가 하는 계산을 모두 흉내 낼 수 있다는 뜻이에요.":
     "In 1985 Stephen Wolfram guessed that this rule could carry out any computation, and Matthew Cook, who was assisting his research, proved it and published the proof in 2004. Given the right repeating background, it can imitate any computation a computer can do.",
   "규칙 110을 좌우로 뒤집은 규칙 124예요. 무늬가 반대쪽으로 자라요.": "Rule 124 is Rule 110 flipped left to right. The pattern grows toward the other side.",
+  "14색 순환": "14-color cyclic",
+  "데이비드 그리피스": "David Griffeath",
+  "무작위로 칠한 판이 저절로 소용돌이로 정리돼요.": "Paint the board at random, and it sorts itself into spirals.",
+  "색이 고리를 이뤄 돌아요(14 다음은 다시 1). 위아래·좌우 이웃 가운데 바로 다음 색인 칸이 하나라도 있으면 그 색으로 넘어가요. 데이비드 그리피스가 만들고 여러 사람이 함께 살핀 규칙이에요.":
+    "Colors go around a wheel (after 14 comes 1 again). If any neighbor above, below, left or right has the next color, a cell moves on to that color. David Griffeath devised this rule, and many others have studied it with him.",
+  "무작위로 칠해 두면 처음엔 자잘한 얼룩이 생기고, 한 색씩 번지는 덩어리를 거쳐, 끝내 소용돌이가 칠한 곳을 모두 차지해요. 1989년 A. K. 듀드니는 이 과정을 '잔해, 물방울, 결함, 악마'라고 불러 칼럼에 소개했어요.":
+    "Start from random paint: tiny specks appear first, then patches of color spread, and in the end spirals take over everything that was painted. In 1989 A. K. Dewdney described these stages in his column as debris, droplets, defects and demons.",
   "와이어월드": "Wireworld",
   "브라이언 실버먼, 1987": "Brian Silverman, 1987",
   "도선을 따라 전자가 흐르는, 칸으로 만든 전자 회로예요.": "Electronic circuits made of cells, with electrons flowing along wires.",
@@ -429,6 +436,8 @@ export const EN = {
   "agents: 개미는 {max}마리까지 배열로 적어요": "agents: list up to {max} ants in an array",
   "agents[{i}]: x·y 는 정수, dir 은 N·E·S·W 가운데 하나여야 해요": "agents[{i}]: x and y must be integers, and dir one of N, E, S or W",
   "rule.number: 0–255 사이 정수여야 해요": "rule.number: must be an integer from 0 to 255",
+  "neighborhood: 순환은 moore 나 von-neumann 이에요": "neighborhood: cyclic rules use moore or von-neumann",
+  "rule.threshold: 1–{max} 사이 정수여야 해요": "rule.threshold: must be an integer from 1 to {max}",
   "rule.number: 끝없는 격자에서는 홀수 번호(000 → 1)를 쓸 수 없어요": "rule.number: odd numbers (000 → 1) can't be used on an endless grid",
   "rule.transitions: 줄을 {max}개까지 배열로 적어요": "rule.transitions: list up to {max} lines in an array",
   "rule.transitions[{i}]: from·to 는 상태 번호, when 은 { state, count } 꼴이어야 해요":
@@ -473,6 +482,13 @@ export const EN = {
   "색 6": "Color 6",
   "색 7": "Color 7",
   "색 8": "Color 8",
+  "색 9": "Color 9",
+  "색 10": "Color 10",
+  "색 11": "Color 11",
+  "색 12": "Color 12",
+  "색 13": "Color 13",
+  "색 14": "Color 14",
+  "바탕": "Background",
   "전자 머리": "Electron head",
   "전자 꼬리": "Electron tail",
   "도선": "Wire",
