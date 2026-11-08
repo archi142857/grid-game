@@ -57,5 +57,5 @@ export function boardColors(states) {
   const dying = [];
   for (let k = 2; k < C; k++) dying[k] = mixRgb(ink, empty, 0.38 + (0.42 * (k - 2)) / Math.max(1, C - 2));
   const own = (i, c) => (states[i]?.color ? hexToRgb(states[i].color) : c);
-  return { bg, empty, ink: own(1, ink), signal, dying: dying.map((c, k) => (c ? own(k, c) : c)), ring: hexToRgb(cssVar("--ink-3")) };
+  return { bg, empty, ink: own(1, ink), signal, dying: dying.map((c, k) => (c ? own(k, c) : c)), ring: hexToRgb(cssVar("--ink-4")) };
 }
