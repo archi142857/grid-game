@@ -1,7 +1,9 @@
 /* Grid Game — 격자 게임
    칸은 점이다: 격자, 규칙 단추, 로고, 도감 그림이 모두 같은 점으로 그려진다.
    색은 변화에만 쓴다: 바탕은 종이와 흑연색, 방금 태어난 칸만 신호색(--signal)으로 빛난다.
-   글꼴은 두 목소리: 사람의 말은 Pretendard, 기계의 숫자(세대 수, B3/S23)는 점 글꼴 Doto. */
+   글꼴은 두 목소리: 사람의 말은 Pretendard, 기계의 숫자(세대 수, B3/S23)는 점 글꼴 Doto.
+   잉크: --ink·--ink-2·--ink-3 은 글씨라서 어느 바탕(page·raise·board)에서도 4.5:1 을 넘긴다.
+   --ink-4 는 글씨가 아닌 것(커서를 올렸을 때의 테두리, 이웃 고리, 그래프 십자선, 꺼진 단추)에만 쓴다. */
 
 :root {
   color-scheme: light;
@@ -10,7 +12,8 @@
   --board: #ffffff;
   --ink: #1a1b1d;
   --ink-2: #5d6067;
-  --ink-3: #8d9097;
+  --ink-3: #6a6d74;
+  --ink-4: #8d9097;
   --line: #e2e2dd;
   --dot-0: #dfdfd9;
   --signal: #dc2f6c;
@@ -36,7 +39,8 @@
   --board: #0b0c0e;
   --ink: #ececea;
   --ink-2: #a4a7ae;
-  --ink-3: #70737b;
+  --ink-3: #82858d;
+  --ink-4: #70737b;
   --line: #27292e;
   --dot-0: #24262b;
   --signal: #ff5a95;
@@ -275,7 +279,7 @@ main {
     transform 0.1s;
 }
 .btn:hover {
-  box-shadow: inset 0 0 0 1px var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--ink-4);
 }
 .btn:active {
   transform: translateY(1px);
@@ -402,7 +406,7 @@ main {
     transform 0.18s var(--ease);
 }
 .count:hover {
-  box-shadow: inset 0 0 0 1.5px var(--ink-3);
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
   color: var(--ink);
 }
 .count[aria-pressed="true"] {
@@ -420,7 +424,7 @@ main {
 }
 /* 태어남 0: 끝없는 격자에서는 쓸 수 없다 */
 .count.locked {
-  color: var(--ink-3);
+  color: var(--ink-4);
   box-shadow: inset 0 0 0 1.5px var(--line);
   background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--ink) 7%, transparent) 3px 4px);
   cursor: not-allowed;
@@ -515,7 +519,7 @@ main {
   background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
 .zoom-btn:disabled {
-  color: var(--ink-3);
+  color: var(--ink-4);
   opacity: 0.45;
   background: none;
   cursor: default;
@@ -848,7 +852,7 @@ main {
   position: absolute;
   inset: 8%;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1.5px var(--ink-3);
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
 }
 .mini > button.pick::after {
   content: "";
@@ -858,7 +862,7 @@ main {
   box-shadow: inset 0 0 0 2.5px var(--signal);
 }
 .mini > button:hover::before {
-  box-shadow: 0 0 0 2px var(--ink-3);
+  box-shadow: 0 0 0 2px var(--ink-4);
 }
 .bubble {
   position: absolute;
@@ -1022,7 +1026,7 @@ main {
 }
 .spec.new:hover .spec-art {
   box-shadow:
-    inset 0 0 0 1.5px var(--ink-3),
+    inset 0 0 0 1.5px var(--ink-4),
     var(--lift);
 }
 .soon {
@@ -1100,7 +1104,7 @@ main {
 }
 .code-in:hover,
 .code-in:focus {
-  border-bottom-color: var(--ink-3);
+  border-bottom-color: var(--ink-4);
   outline: none;
 }
 .code-in.edited {
@@ -1208,7 +1212,7 @@ main {
   pointer-events: none;
 }
 .spark .cross {
-  stroke: var(--ink-3);
+  stroke: var(--ink-4);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -1552,6 +1556,7 @@ html.has-full body {
   justify-self: end;
   margin-right: 16px;
 }
+/* 알약 밑으로 칸이 비쳐 바탕이 바뀌니 라벨도 --ink-2 로 진하게 */
 .is-full .stage-stats {
   position: absolute;
   z-index: 2;
@@ -1567,7 +1572,7 @@ html.has-full body {
   -webkit-backdrop-filter: blur(14px) saturate(1.3);
   backdrop-filter: blur(14px) saturate(1.3);
   box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 0.8125rem;
   font-weight: 550;
   pointer-events: none;
