@@ -1,0 +1,11 @@
+{
+  "id": "fibonacci-turmite",
+  "name": "피보나치 나선 터마이트",
+  "description": "개미에게 속 상태가 둘 있는 터마이트예요. 빈 판에서 시작해 피보나치 나선을 그리며 커져요.",
+  "family": "ant",
+  "grid": { "edges": "infinite" },
+  "states": [{ "name": "빈칸" }, { "name": "칠한 칸" }],
+  "rule": { "machine": [[[1, "L", 1], [1, "L", 1]], [[1, "R", 1], [0, "N", 0]]] },
+  "agents": [{ "x": 0, "y": 0, "dir": "N" }],
+  "seed": { "type": "empty" }
+}

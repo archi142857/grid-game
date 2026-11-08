@@ -3,10 +3,13 @@
 // 세대 수·기록·처음 모습·보는 자리는 화면 쪽(ui/world.js)이 맡는다. sim 은 칸과 계산만.
 // 화면 글은 만들지 않는다. 살펴보기의 까닭(why)은 짧은 낱말로만 돌려주고, 글은 프론트엔드가 t() 로 만든다.
 
-import { makePlane } from "./plane.js";
+import { makePlane, REACH } from "./plane.js";
 import { makeTable, explain as lifeExplain } from "./life.js";
+import { compileAnt, stepAnts, MAX_AGENTS, TURN_LETTERS, DIR_LETTERS } from "./ant.js";
 import { parseRLE } from "./rle.js";
 import { lifeRule } from "./rules.js";
+
+export { MAX_ANT_COLORS, MAX_ANT_STATES, MAX_AGENTS } from "./ant.js";
 
 /** 쓰는 조각(32×32)이 이만큼을 넘으면(약 100만 칸) 너무 넓게 퍼진 것으로 보고 멈춘다 */
 export const MAX_TILES = 1024;
@@ -25,7 +28,7 @@ export const around = (x, y) => [
   [x + 1, y + 1],
 ];
 
-const BUILD = { life: lifeSim };
+const BUILD = { life: lifeSim, ant: antSim };
 
 /** 이 엔진이 sim 으로 돌릴 수 있는 계열 */
 export const SIM_FAMILIES = Object.keys(BUILD);
@@ -184,6 +187,213 @@ function lifeSim(rule) {
       const now = P.get(x, y);
       const e = lifeExplain(lifeRule(r), now, n);
       return { now, next: e.next, why: e.why, n, cells };
+    },
+  };
+  return sim;
+}
+
+// ── 개미·터마이트 ─────────────────
+// 칸은 plane 에 색(0–색 수-1)으로, 개미는 따로 [{ x, y, dir, state }] 로 둔다. 앞 칸은 주지 않는다(사이를 잇지 않음).
+
+const DEFAULT_AGENTS = [{ x: 0, y: 0, dir: "N" }];
+const inReach = (a) => a.x >= -REACH && a.x < REACH && a.y >= -REACH && a.y < REACH;
+
+function antSim(rule) {
+  const P = makePlane();
+  let r = rule;
+  let prog = compileAnt(r, r.states.length);
+  const agents = [];
+  let gone = false; // 개미가 칸을 둘 수 있는 끝 밖으로 나갔다
+  let since = 0; // 빈 조각을 치운 뒤 걸음 수
+
+  const colors = () => r.states.length;
+
+  function addAgent(x, y, dir = 0) {
+    const a = { x: Math.round(x), y: Math.round(y), dir: dir & 3, state: 0 };
+    if (agents.length >= MAX_AGENTS || !inReach(a)) return -1;
+    agents.push(a);
+    return agents.length - 1;
+  }
+
+  /** 규칙 파일의 개미(놓는 곳 가운데 기준)를 (cx, cy) 둘레에 놓는다 */
+  function placeAgents(cx, cy) {
+    for (const a of r.agents ?? DEFAULT_AGENTS) addAgent(cx + a.x, cy + a.y, Math.max(0, DIR_LETTERS.indexOf(a.dir)));
+  }
+
+  /** 칸 색을 무작위로(1–색 수-1) 칠할 때 */
+  const randomColor = (rng) => () => 1 + rng.int(colors() - 1);
+
+  const sim = {
+    family: "ant",
+    get rule() {
+      return r;
+    },
+    /** 개미는 어떤 규칙이든 돌릴 수 있다(개미가 없으면 걸어도 아무 일이 없다) */
+    canRun: () => true,
+    /** 너무 넓게 퍼졌거나, 개미가 칸을 둘 수 있는 끝(가운데에서 약 96만 칸) 밖으로 나갔다 */
+    get full() {
+      return gone || P.size > MAX_TILES;
+    },
+
+    /** 모든 개미가 n 걸음(기본 1). 못 가면 null. → { alive(빈칸 아닌 칸), changed(칠한 칸), steps } */
+    step(n = 1) {
+      if (sim.full) return null;
+      let changed = 0;
+      let k = 0;
+      while (k < n) {
+        changed += stepAnts(P, agents, prog);
+        k++;
+        if (++since >= 1024) {
+          since = 0;
+          P.prune();
+        }
+        if (!agents.every(inReach)) {
+          gone = true;
+          break;
+        }
+        if (P.size > MAX_TILES) {
+          P.prune();
+          if (P.size > MAX_TILES) break;
+        }
+      }
+      return { alive: P.filled, changed, steps: k };
+    },
+
+    get: (x, y) => P.get(x, y),
+    /** 칸 색을 바꾸고 원래 값을 돌려준다. 규칙에 없는 색은 받지 않는다 */
+    set(x, y, v) {
+      if (!(Number.isInteger(v) && v >= 0 && v < colors())) return P.get(x, y);
+      return P.set(x, y, v);
+    },
+    /** 그리기용. 앞 칸은 늘 null */
+    blocks(x0, y0, x1, y1, fn) {
+      P.blocks(x0, y0, x1, y1, (ox, oy, s, cells) => fn(ox, oy, s, s, cells, null));
+    },
+    /** 칠한 칸과 개미 자리를 모두 덮는 네모. 둘 다 없으면 null */
+    bounds() {
+      let b = P.bounds();
+      for (const a of agents) {
+        if (!b) b = { x0: a.x, y0: a.y, x1: a.x, y1: a.y };
+        else b = { x0: Math.min(b.x0, a.x), y0: Math.min(b.y0, a.y), x1: Math.max(b.x1, a.x), y1: Math.max(b.y1, a.y) };
+      }
+      return b;
+    },
+
+    /** 개미들 [{ x, y, dir(0 위 · 1 오른쪽 · 2 아래 · 3 왼쪽), state(터마이트 속 상태) }]. 읽기만 한다 */
+    get agents() {
+      return agents;
+    },
+    head: null,
+    /** 빈칸이 아닌 칸 수 */
+    get alive() {
+      return P.filled;
+    },
+    get size() {
+      return P.size;
+    },
+
+    /** (x, y) 에 있는 개미의 번호. 없으면 -1 */
+    agentAt(x, y) {
+      return agents.findIndex((a) => a.x === x && a.y === y);
+    },
+    /** 개미를 놓고 번호를 돌려준다. 더 놓을 수 없으면 -1 */
+    addAgent,
+    removeAgent(i) {
+      if (i < 0 || i >= agents.length) return false;
+      agents.splice(i, 1);
+      return true;
+    },
+    /** 개미를 시계 방향으로 by 번(기본 1) 돌리고 새 방향을 돌려준다 */
+    turnAgent(i, by = 1) {
+      const a = agents[i];
+      if (!a) return -1;
+      a.dir = (a.dir + by) & 3;
+      return a.dir;
+    },
+    /** 개미 놓기 손: 없으면 위를 보는 개미를 놓고, 있으면 시계 방향으로 돌리고, 왼쪽을 보던 개미는 치운다. 한 일: add · turn · remove · null(더 못 놓음) */
+    cycleAgent(x, y) {
+      const i = sim.agentAt(x, y);
+      if (i < 0) return addAgent(x, y, 0) < 0 ? null : "add";
+      if (agents[i].dir === 3) {
+        agents.splice(i, 1);
+        return "remove";
+      }
+      agents[i].dir++;
+      return "turn";
+    },
+
+    snapshot: () => ({ family: "ant", states: colors(), cells: P.snapshot(), agents: agents.map((a) => ({ ...a })) }),
+    restore(snap) {
+      P.restore(snap.cells);
+      if (snap.states > colors()) P.clampStates(colors());
+      agents.length = 0;
+      for (const a of snap.agents ?? []) agents.push({ ...a, state: a.state < prog.states ? a.state : 0 });
+      gone = !agents.every(inReach);
+      since = 0;
+    },
+
+    /** 같은 계열 안에서 규칙만 바꾼다(칸과 개미는 그대로). 색이 줄면 없어진 색의 칸은 빈칸, 속 상태가 줄면 그 개미는 0 으로 */
+    setRule(next) {
+      if (next.family !== "ant") throw new Error(`setRule: 계열이 달라요 (ant → ${next.family}). 새 sim 을 만들어 주세요`);
+      const fewer = next.states.length < r.states.length;
+      r = next;
+      prog = compileAnt(r, colors());
+      if (fewer) P.clampStates(colors());
+      for (const a of agents) if (a.state >= prog.states) a.state = 0;
+    },
+
+    /** 칸과 개미를 모두 비운다 */
+    clear() {
+      P.clear();
+      agents.length = 0;
+      gone = false;
+      since = 0;
+    },
+
+    /** 비우고 seed 대로 칠한 뒤, 규칙 파일의 개미를 region 가운데에 놓는다 */
+    seed(region, rng) {
+      sim.clear();
+      const s = r.seed ?? { type: "empty" };
+      const cx = region.x + (region.w >> 1);
+      const cy = region.y + (region.h >> 1);
+      if (s.type === "random") fillRegion(P, region, s.density ?? 0.3, s.area ?? 1, rng, randomColor(rng));
+      else if (s.type === "single") P.set(cx, cy, 1);
+      else if (s.type === "rle") putRows(P, parseRLE(s.data).rows, ...regionCenter(region), colors());
+      placeAgents(cx, cy);
+    },
+
+    /** 비우고 칸 색을 무작위로 흩뿌린 뒤, 규칙 파일의 개미를 region 가운데에 놓는다 */
+    scatter(region, density, rng) {
+      sim.clear();
+      const s = r.seed;
+      fillRegion(P, region, density, s && s.type === "random" ? (s.area ?? 1) : 1, rng, randomColor(rng));
+      placeAgents(region.x + (region.w >> 1), region.y + (region.h >> 1));
+    },
+
+    /** 비우고 무늬를 (cx, cy) 가운데에 칠한 뒤, 규칙 파일의 개미를 그 둘레에 놓는다 */
+    place(rows, cx = 0, cy = 0) {
+      sim.clear();
+      putRows(P, rows, cx, cy, colors());
+      placeAgents(Math.round(cx), Math.round(cy));
+    },
+
+    /**
+     * 살펴보기. { now, next, why, agent, turn, write, state, cells: [] }
+     *   why: ant(개미가 밟고 있어 다음 걸음에 칠한다) · wait(개미가 없어 그대로)
+     *   turn·write: 그 칸에서 개미가 돌 글자와 칠할 색. 개미가 없으면 속 상태 0 의 개미가 밟았을 때(터마이트는 null)
+     */
+    explain(x, y) {
+      const now = P.get(x, y);
+      const k = colors();
+      const c = now < k ? now : 0;
+      const i = sim.agentAt(x, y);
+      if (i < 0) {
+        const plain = !r.machine;
+        return { now, next: now, why: "wait", agent: -1, turn: plain ? TURN_LETTERS[prog.turn[c]] : null, write: plain ? prog.write[c] : null, state: null, cells: [] };
+      }
+      const a = agents[i];
+      const j = a.state * k + c;
+      return { now, next: prog.write[j], why: "ant", agent: i, turn: TURN_LETTERS[prog.turn[j]], write: prog.write[j], state: a.state, cells: [] };
     },
   };
   return sim;

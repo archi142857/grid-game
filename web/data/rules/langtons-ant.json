@@ -1,14 +1,11 @@
 {
   "id": "langtons-ant",
   "name": "랭턴의 개미",
-  "description": "흰 칸에서는 오른쪽, 검은 칸에서는 왼쪽으로 돌고, 밟고 있던 칸의 색을 뒤집은 뒤 한 칸 앞으로 간다. 약 1만 스텝 동안 어지럽게 움직이다가 갑자기 규칙적인 '고속도로'를 만들기 시작한다.",
+  "description": "빈칸에서는 오른쪽, 칠한 칸에서는 왼쪽으로 돌고, 밟은 칸을 뒤집은 뒤 한 칸 나아가요. 1만 걸음쯤 어지럽게 헤매다가 갑자기 곧게 뻗는 '고속도로'를 깔기 시작해요.",
   "family": "ant",
-  "grid": { "width": 200, "height": 200, "edges": "wrap" },
-  "states": [
-    { "name": "흰 칸", "color": "#f2f2f2" },
-    { "name": "검은 칸", "color": "#111418" }
-  ],
+  "grid": { "edges": "infinite" },
+  "states": [{ "name": "빈칸" }, { "name": "칠한 칸" }],
   "rule": { "turns": "RL" },
-  "agents": [{ "x": 100, "y": 100, "dir": "N" }],
+  "agents": [{ "x": 0, "y": 0, "dir": "N" }],
   "seed": { "type": "empty" }
 }

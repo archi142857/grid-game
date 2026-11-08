@@ -1,30 +1,45 @@
-// 규칙 파일(JSON)을 검사하고 앱이 쓰는 꼴로 고른다. 1단계에서는 Life 계열만 돌린다.
-// 형식은 기획서 5절을 따른다. 상태 색(color)을 빼면 화면 색을 쓴다.
-// 격자(grid.edges): infinite 는 끝없는 격자, wrap·wall 은 크기(width·height)가 있는 격자. Life 계열은 끝없는 격자에서 돌린다.
+// 규칙 파일(JSON)을 검사하고 앱이 쓰는 꼴로 고른다. 형식은 기획서 5절과 계열 확장 설계 3절을 따른다.
+// 모든 계열이 끝없는 격자(grid.edges: infinite)에서 돈다. wrap·wall 은 파일 꼴에만 남아 있고 지금은 받지 않는다.
+// 상태 색(color)을 빼면 화면 색을 쓴다.
+// 앱 안의 규칙은 계열 내용을 맨 위로 꺼낸 꼴이다: Life 는 birth·survive, 개미는 turns 나 machine 과 agents.
 
 import { t } from "../i18n.js";
-import { MIN_STATES, MAX_STATES } from "./life.js";
+import { MIN_STATES, MAX_STATES, parseNotation, formatNotation } from "./life.js";
+import { MAX_ANT_COLORS, MAX_AGENTS, DIR_LETTERS, parseTurns, antRuleProblem } from "./ant.js";
 
+/** 엔진이 아는 계열 */
+export const FAMILIES = ["life", "ant"];
+/** 화면이 붙은 계열. checkRuleFile 은 따로 말하지 않으면 이것만 받는다(화면이 되면 프론트엔드 쪽지를 받고 넣는다) */
 export const READY_FAMILIES = ["life"];
 export const SEED_TYPES = ["empty", "random", "single", "rle"];
 export const EDGES = ["infinite", "wrap", "wall"];
 
+/** 계열마다 상태 수의 끝 */
+const STATE_RANGE = {
+  life: [MIN_STATES, MAX_STATES],
+  ant: [2, MAX_ANT_COLORS],
+};
+
 const HEX = /^#[0-9a-f]{6}$/i;
 const uniqSorted = (xs) => [...new Set(xs)].sort((a, b) => a - b);
 const isCountList = (xs) => Array.isArray(xs) && xs.every((n) => Number.isInteger(n) && n >= 0 && n <= 8);
-const isSize = (n) => Number.isInteger(n) && n >= 3 && n <= 2000;
+const clone = (x) => JSON.parse(JSON.stringify(x));
 
-/** 규칙 파일을 검사한다. 맞으면 { rule }, 틀리면 { errors: [글…] } */
-export function checkRuleFile(obj) {
+/**
+ * 규칙 파일을 검사한다. 맞으면 { rule }, 틀리면 { errors: [글…] }
+ * families: 받을 계열(기본은 화면이 붙은 계열 READY_FAMILIES)
+ */
+export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return { errors: [t("규칙 파일은 { } 로 감싼 JSON 이어야 해요")] };
+  const family = obj.family;
+  if (!FAMILIES.includes(family) || !families.includes(family)) return { errors: [t("family: 아직 돌릴 수 없는 계열이에요 ({f})", { f: String(family) })] };
   const errors = [];
 
-  if (!READY_FAMILIES.includes(obj.family)) errors.push(t("family: 아직 돌릴 수 없는 계열이에요 ({f})", { f: String(obj.family) }));
-
+  const [min, max] = STATE_RANGE[family];
   const states = obj.states;
-  if (!Array.isArray(states) || states.length < MIN_STATES || states.length > MAX_STATES) {
-    errors.push(t("states: 상태는 {min}–{max}개여야 해요", { min: MIN_STATES, max: MAX_STATES }));
-  } else {
+  const statesOk = Array.isArray(states) && states.length >= min && states.length <= max;
+  if (!statesOk) errors.push(t("states: 상태는 {min}–{max}개여야 해요", { min, max }));
+  else {
     states.forEach((s, i) => {
       if (!s || typeof s !== "object" || typeof s.name !== "string") errors.push(t("states[{i}]: name 글이 있어야 해요", { i }));
       else if (s.color !== undefined && !HEX.test(s.color)) errors.push(t("states[{i}]: color 는 #rrggbb 꼴이어야 해요", { i }));
@@ -32,23 +47,39 @@ export function checkRuleFile(obj) {
   }
 
   const rule = obj.rule ?? {};
-  if (!isCountList(rule.birth)) errors.push(t("rule.birth: 0–8 사이 정수의 배열이어야 해요"));
-  else if (obj.family === "life" && rule.birth.includes(0)) errors.push(t("rule.birth: 끝없는 격자에서는 0을 쓸 수 없어요"));
-  if (!isCountList(rule.survive)) errors.push(t("rule.survive: 0–8 사이 정수의 배열이어야 해요"));
-
-  const neighborhood = obj.neighborhood ?? "moore";
-  if (neighborhood !== "moore") errors.push(t("neighborhood: 지금은 moore 만 돼요"));
+  let neighborhood = null;
+  if (family === "life") {
+    if (!isCountList(rule.birth)) errors.push(t("rule.birth: 0–8 사이 정수의 배열이어야 해요"));
+    else if (rule.birth.includes(0)) errors.push(t("rule.birth: 끝없는 격자에서는 0을 쓸 수 없어요"));
+    if (!isCountList(rule.survive)) errors.push(t("rule.survive: 0–8 사이 정수의 배열이어야 해요"));
+    neighborhood = obj.neighborhood ?? "moore";
+    if (neighborhood !== "moore") errors.push(t("neighborhood: 지금은 moore 만 돼요"));
+  } else if (family === "ant") {
+    if (statesOk) {
+      const why = antRuleProblem(rule, states.length);
+      if (why === "both") errors.push(t("rule: turns 와 machine 가운데 하나만 적어요"));
+      else if (why === "none") errors.push(t("rule: 개미는 turns, 터마이트는 machine 을 적어요"));
+      else if (why === "turns") errors.push(t("rule.turns: 칸 색마다 L·R·N·U 가운데 한 글자씩, 상태 수만큼 적어요"));
+      else if (why === "machine") errors.push(t("rule.machine: [개미 상태][칸 색] = [쓸 색, 회전 글자, 다음 개미 상태] 꼴이어야 해요"));
+    }
+    const agents = obj.agents;
+    if (agents !== undefined) {
+      if (!Array.isArray(agents) || agents.length > MAX_AGENTS) errors.push(t("agents: 개미는 {max}마리까지 배열로 적어요", { max: MAX_AGENTS }));
+      else
+        agents.forEach((a, i) => {
+          const ok = a && Number.isInteger(a.x) && Number.isInteger(a.y) && typeof a.dir === "string" && a.dir.length === 1 && DIR_LETTERS.includes(a.dir);
+          if (!ok) errors.push(t("agents[{i}]: x·y 는 정수, dir 은 N·E·S·W 가운데 하나여야 해요", { i }));
+        });
+    }
+  }
 
   const grid = obj.grid ?? {};
   const edges = grid.edges ?? "infinite";
   if (!EDGES.includes(edges)) errors.push(t("grid.edges: infinite·wrap·wall 가운데 하나여야 해요"));
-  else if (obj.family === "life" && edges !== "infinite") errors.push(t("grid.edges: Life 계열은 끝없는 격자(infinite)에서 돌아가요"));
-  if (edges === "infinite") {
-    if (grid.width !== undefined || grid.height !== undefined) errors.push(t("grid.width·height: 끝없는 격자에는 크기를 적지 않아요"));
-  } else {
-    if (grid.width !== undefined && !isSize(grid.width)) errors.push(t("grid.width: 3–2000 사이 정수여야 해요"));
-    if (grid.height !== undefined && !isSize(grid.height)) errors.push(t("grid.height: 3–2000 사이 정수여야 해요"));
-  }
+  else if (edges !== "infinite") {
+    if (family === "life") errors.push(t("grid.edges: Life 계열은 끝없는 격자(infinite)에서 돌아가요"));
+    else errors.push(t("grid.edges: 지금은 끝없는 격자(infinite)에서만 돌아가요"));
+  } else if (grid.width !== undefined || grid.height !== undefined) errors.push(t("grid.width·height: 끝없는 격자에는 크기를 적지 않아요"));
 
   const seed = obj.seed ?? { type: "empty" };
   if (!seed || !SEED_TYPES.includes(seed.type)) errors.push(t("seed.type: empty·random·single·rle 가운데 하나여야 해요"));
@@ -59,20 +90,32 @@ export function checkRuleFile(obj) {
   } else if (seed.type === "rle" && typeof seed.data !== "string") errors.push(t("seed.data: RLE 글이 있어야 해요"));
 
   if (errors.length) return { errors };
-  return {
-    rule: {
-      id: typeof obj.id === "string" && obj.id ? obj.id : "custom",
-      name: typeof obj.name === "string" && obj.name ? obj.name : t("이름 없는 규칙"),
-      description: typeof obj.description === "string" ? obj.description : "",
-      family: obj.family,
-      grid: edges === "infinite" ? { edges } : { edges, width: grid.width, height: grid.height },
-      neighborhood,
-      states: states.map((s) => (s.color ? { name: s.name, color: s.color } : { name: s.name })),
-      birth: uniqSorted(rule.birth),
-      survive: uniqSorted(rule.survive),
-      seed: { ...seed },
-    },
+  const out = {
+    id: typeof obj.id === "string" && obj.id ? obj.id : "custom",
+    name: typeof obj.name === "string" && obj.name ? obj.name : t("이름 없는 규칙"),
+    description: typeof obj.description === "string" ? obj.description : "",
+    family,
+    grid: { edges },
   };
+  if (neighborhood) out.neighborhood = neighborhood;
+  out.states = states.map((s) => (s.color ? { name: s.name, color: s.color } : { name: s.name }));
+  if (family === "life") {
+    out.birth = uniqSorted(rule.birth);
+    out.survive = uniqSorted(rule.survive);
+  } else if (family === "ant") {
+    if (rule.turns !== undefined) out.turns = rule.turns;
+    else out.machine = clone(rule.machine);
+    out.agents = (obj.agents ?? [{ x: 0, y: 0, dir: "N" }]).map((a) => ({ x: a.x, y: a.y, dir: a.dir }));
+  }
+  out.seed = { ...seed };
+  return { rule: out };
+}
+
+/** 앱 안 규칙의 계열 내용(규칙 파일의 rule 항목) */
+function ruleBody(r) {
+  if (r.family === "life") return { birth: r.birth, survive: r.survive };
+  if (r.family === "ant") return r.turns !== undefined ? { turns: r.turns } : { machine: r.machine };
+  return {};
 }
 
 /** 앱 안의 규칙을 다시 규칙 파일 꼴로(JSON.stringify 할 객체) */
@@ -80,37 +123,55 @@ export function toRuleFile(r) {
   const grid = { edges: r.grid.edges };
   if (r.grid.width) grid.width = r.grid.width;
   if (r.grid.height) grid.height = r.grid.height;
-  return {
-    id: r.id,
-    name: r.name,
-    description: r.description,
-    family: r.family,
-    grid,
-    neighborhood: r.neighborhood,
-    states: r.states,
-    rule: { birth: r.birth, survive: r.survive },
-    seed: r.seed,
-  };
+  const out = { id: r.id, name: r.name, description: r.description, family: r.family, grid };
+  if (r.neighborhood) out.neighborhood = r.neighborhood;
+  out.states = r.states;
+  out.rule = ruleBody(r);
+  if (r.family === "ant") out.agents = r.agents;
+  out.seed = r.seed;
+  return out;
 }
 
-export function defaultStateName(i) {
+/** 상태 i 의 기본 이름 */
+export function defaultStateName(i, family = "life") {
   if (i === 0) return t("빈칸");
+  if (family === "ant") return t("색 {k}", { k: i });
   if (i === 1) return t("산 칸");
   return t("사라지는 칸 {k}", { k: i - 1 });
 }
 
-/** 상태 수를 바꿀 때 이름 목록을 맞춘다. 늘리면 '사라지는 칸 k' 를 덧붙인다 */
-export function resizeStates(states, n) {
+/** 상태 수를 바꿀 때 이름 목록을 맞춘다. 늘리면 그 계열의 기본 이름('사라지는 칸 k', 개미는 '색 k')을 덧붙인다 */
+export function resizeStates(states, n, family = "life") {
   const out = states.slice(0, n).map((s) => ({ ...s }));
-  for (let i = out.length; i < n; i++) out.push({ name: defaultStateName(i) });
+  for (let i = out.length; i < n; i++) out.push({ name: defaultStateName(i, family) });
   return out;
 }
 
 /** 엔진(core/life.js)에 넘길 꼴 */
 export const lifeRule = (r) => ({ birth: r.birth, survive: r.survive, states: r.states.length });
 
-/** 움직임이 같은 규칙인가(이름·색·시작 상태는 보지 않는다) */
-export const sameRule = (a, b) => a.birth.join() === b.birth.join() && a.survive.join() === b.survive.join() && a.states.length === b.states.length;
+/** 움직임이 같은 규칙인가(이름·색·시작 상태·개미 자리는 보지 않는다) */
+export const sameRule = (a, b) =>
+  (a.family ?? "life") === (b.family ?? "life") && a.states.length === b.states.length && JSON.stringify(ruleBody(a)) === JSON.stringify(ruleBody(b));
+
+/**
+ * 주소(?rule=)의 표기를 읽는다. 못 읽으면 null
+ *   Life B3/S23 → { family: "life", birth, survive, states } · 개미 LLRR → { family: "ant", turns }
+ */
+export function parseCode(text) {
+  const life = parseNotation(text);
+  if (life) return { family: "life", ...life };
+  const turns = parseTurns(text);
+  if (turns) return { family: "ant", turns };
+  return null;
+}
+
+/** 규칙을 주소에 담을 표기로. 표기가 없는 규칙(터마이트 등)은 null */
+export function formatCode(r) {
+  if (r.family === "life") return formatNotation(lifeRule(r));
+  if (r.family === "ant") return r.turns ?? null;
+  return null;
+}
 
 /** 규칙 파일 글. 맨 위 항목마다 한 줄, 그 안은 한 줄로 적는다(프리셋 파일과 같은 꼴) */
 export function formatRuleFile(obj) {

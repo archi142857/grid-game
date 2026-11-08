@@ -1,0 +1,11 @@
+{
+  "id": "ant-lrrrrrllr",
+  "name": "LRRRRRLLR 개미",
+  "description": "칸 색 아홉 가지를 쓰는 개미예요. 제 둘레를 네모꼴로 빈틈없이 메우며 넓혀 가요.",
+  "family": "ant",
+  "grid": { "edges": "infinite" },
+  "states": [{ "name": "빈칸" }, { "name": "색 1" }, { "name": "색 2" }, { "name": "색 3" }, { "name": "색 4" }, { "name": "색 5" }, { "name": "색 6" }, { "name": "색 7" }, { "name": "색 8" }],
+  "rule": { "turns": "LRRRRRLLR" },
+  "agents": [{ "x": 0, "y": 0, "dir": "N" }],
+  "seed": { "type": "empty" }
+}

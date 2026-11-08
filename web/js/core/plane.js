@@ -11,6 +11,9 @@ const P = S + 2;
 const N = S * S;
 const LIMIT = 30000; // 조각 좌표의 끝(가운데에서 약 96만 칸). 그 밖으로 나간 칸은 사라진다
 
+/** 칸을 둘 수 있는 끝: -REACH ≤ x, y < REACH */
+export const REACH = LIMIT * TILE;
+
 const keyOf = (tx, ty) => tx * 65536 + ty;
 
 // 가장자리 표시: 그 줄에 산 칸이 있으면 그쪽 이웃 조각이 있어야 한다
@@ -68,6 +71,7 @@ export function makePlane() {
   const tiles = new Map();
   const pad = new Uint8Array(P * P);
   let alive = 0;
+  let filled = 0; // 빈칸이 아닌 칸 수
 
   function tileAt(tx, ty, create = false) {
     const k = keyOf(tx, ty);
@@ -93,8 +97,13 @@ export function makePlane() {
     const old = t.cells[i];
     if (old === v) return old;
     t.cells[i] = v;
-    if (old === 0) t.pop++;
-    else if (v === 0) t.pop--;
+    if (old === 0) {
+      t.pop++;
+      filled++;
+    } else if (v === 0) {
+      t.pop--;
+      filled--;
+    }
     if (old === 1) {
       t.live--;
       alive--;
@@ -189,6 +198,7 @@ export function makePlane() {
       changed += ch;
     }
     let total = 0;
+    let all = 0;
     for (const [k, t] of tiles) {
       const c = t.cells;
       t.cells = t.next;
@@ -199,9 +209,11 @@ export function makePlane() {
       t.edge = t.live ? edgeOf(t.cells) : 0;
       t.dirty = false;
       total += t.live;
+      all += t.pop;
       if (t.pop === 0 && t.prevPop === 0) tiles.delete(k);
     }
     alive = total;
+    filled = all;
     return { alive, changed };
   }
 
@@ -246,6 +258,12 @@ export function makePlane() {
   function clear() {
     tiles.clear();
     alive = 0;
+    filled = 0;
+  }
+
+  /** 칸이 하나도 없는 조각을 치운다(step 을 쓰지 않는 계열이 부른다) */
+  function prune() {
+    for (const [k, t] of tiles) if (t.pop === 0 && t.prevPop === 0) tiles.delete(k);
   }
 
   /** 지금 모습을 떠 둔다(처음으로 돌아갈 때 쓴다) */
@@ -276,6 +294,7 @@ export function makePlane() {
       }
     }
     alive += live - t.live;
+    filled += pop - t.pop;
     t.pop = pop;
     t.live = live;
     t.dirty = true;
@@ -307,6 +326,7 @@ export function makePlane() {
     blocks,
     bounds,
     clear,
+    prune,
     snapshot,
     restore,
     clampStates,
@@ -314,6 +334,10 @@ export function makePlane() {
     /** 산 칸(상태 1) 수 */
     get alive() {
       return alive;
+    },
+    /** 빈칸이 아닌 칸 수 */
+    get filled() {
+      return filled;
     },
     /** 쓰고 있는 조각 수(넓게 퍼질수록 커진다) */
     get size() {
