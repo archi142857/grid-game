@@ -1,6 +1,6 @@
 {
   "id": "ant-lrrrrrllr",
-  "name": "LRRRRRLLR 개미",
+  "name": "네모 개미",
   "description": "칸 색 아홉 가지를 쓰는 개미예요. 제 둘레를 네모꼴로 빈틈없이 메우며 넓혀 가요.",
   "family": "ant",
   "grid": { "edges": "infinite" },

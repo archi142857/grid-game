@@ -1,7 +1,7 @@
 {
   "id": "ant-llrr",
-  "name": "LLRR 개미",
-  "description": "칸 색 네 가지를 차례로 칠하며 색마다 L·L·R·R 로 도는 개미예요. 좌우가 똑같은 모양으로 커져요.",
+  "name": "대칭 개미",
+  "description": "칸 색 네 가지를 차례로 칠하며 색마다 L·L·R·R 로 도는 개미예요. 자라면서 몇 번이고 대칭인 모양이 돼요.",
   "family": "ant",
   "grid": { "edges": "infinite" },
   "states": [{ "name": "빈칸" }, { "name": "색 1" }, { "name": "색 2" }, { "name": "색 3" }],
