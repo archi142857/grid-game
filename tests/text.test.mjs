@@ -2,14 +2,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { josa } from "../web/js/core/josa.js";
 import { t } from "../web/js/i18n.js";
 import { formatRuleFile } from "../web/js/core/rules.js";
 import { ranges, describeRule } from "../web/js/ui/rulepad.js";
-import { MORE_RULES, entryOf } from "../web/js/data/catalog.js";
+import { MORE_RULES, entryOf, catalogIds } from "../web/js/data/catalog.js";
 import { parseNotation } from "../web/js/core/life.js";
 import { checkRuleFile } from "../web/js/core/rules.js";
 import { parseRLE } from "../web/js/core/rle.js";
@@ -73,24 +73,43 @@ test("목록의 프리셋 파일은 규칙 파일 꼴(formatRuleFile)로 적혀 
   }
 });
 
+/** 볼 것의 규칙 표기가 어느 계열 꼴인지. Life B3/S23, 개미 LLRR(L·R·N·U), 1차원 W30(짝수만: 홀수는 빈 곳이 저절로 켜져 잠근다) */
+function notationFamily(code) {
+  if (parseNotation(code)) return "life";
+  if (/^[LRNU]{2,}$/.test(code)) return "ant";
+  const m = /^W(\d{1,3})$/.exec(code);
+  if (m && Number(m[1]) <= 255 && Number(m[1]) % 2 === 0) return "elementary";
+  return null;
+}
+
 test("도감 규칙마다 도감 글이 있고, 볼 것의 무늬·표기는 읽힌다", () => {
   const dir = join(ROOT, "web/data/rules");
   const ids = JSON.parse(readFileSync(join(dir, "index.json"), "utf8"));
   for (const id of ids) {
     const rule = checkRuleFile(JSON.parse(readFileSync(join(dir, `${id}.json`), "utf8"))).rule;
     assert.ok(rule, id);
+    assert.ok(entryOf(id), `${id} 의 도감 글`);
+  }
+  // 다음 계열의 도감 글은 규칙 파일보다 먼저 들어온다. 글이 있는 규칙은 모두 본다
+  for (const id of catalogIds()) {
     const e = entryOf(id);
-    assert.ok(e, `${id} 의 도감 글`);
-    assert.ok(e.about().length > 0, id);
+    assert.ok(e.short() && e.tag() && e.about().length > 0, id);
+    const file = join(dir, `${id}.json`);
+    const family = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).family : null;
     for (const w of e.watch()) {
+      assert.ok(w.name && w.text, `${id} 볼 것의 이름·설명`);
       if (w.kind === "pattern")
         assert.ok(
           parseRLE(w.rle)
             .rows.flat()
-            .some((v) => v === 1),
+            .some((v) => v > 0),
           `${id} ${w.name}`,
         );
-      if (w.kind === "rule") assert.ok(parseNotation(w.notation), `${id} ${w.notation}`);
+      if (w.kind === "rule") {
+        const f = notationFamily(w.notation);
+        assert.ok(f, `${id} ${w.notation}`);
+        if (family) assert.equal(f, family, `${id} ${w.notation}: ${family} 계열 표기여야 해요`);
+      }
     }
   }
   for (const r of MORE_RULES()) assert.ok(parseNotation(r.notation), r.notation);
