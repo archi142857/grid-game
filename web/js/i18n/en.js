@@ -354,6 +354,17 @@ export const EN = {
   "1985년 스티븐 울프럼은 이 규칙으로 어떤 계산이든 할 수 있으리라 짐작했고, 그의 연구를 돕던 매슈 쿡이 이를 증명해 2004년에 발표했어요. 알맞은 바탕 무늬만 깔아 주면 컴퓨터가 하는 계산을 모두 흉내 낼 수 있다는 뜻이에요.":
     "In 1985 Stephen Wolfram guessed that this rule could carry out any computation, and Matthew Cook, who was assisting his research, proved it and published the proof in 2004. Given the right repeating background, it can imitate any computation a computer can do.",
   "규칙 110을 좌우로 뒤집은 규칙 124예요. 무늬가 반대쪽으로 자라요.": "Rule 124 is Rule 110 flipped left to right. The pattern grows toward the other side.",
+  "육각 생명": "Hexagonal Life",
+  "이웃이 여섯인 벌집 격자에서 돌리는 생명 게임이에요.": "The Game of Life on a honeycomb grid, where each cell has six neighbors.",
+  "칸을 벌집처럼 엇갈려 놓으면 이웃이 여덟이 아니라 여섯이 돼요. 그래서 숫자도 달라요. 빈칸은 산 이웃이 2개면 태어나고, 산 칸은 3개나 4개면 살아남아요.":
+    "Stagger the cells like a honeycomb and each cell has six neighbors instead of eight, so the numbers change too: an empty cell is born with 2 live neighbors, and a live cell survives with 3 or 4.",
+  "표기 끝의 H 는 육각(hexagonal)이라는 뜻이에요. Golly 와 같은 꼴이라 거기서 쓰던 육각 무늬를 그대로 가져올 수 있어요. 숫자 점을 바꿔 가며 육각에서도 글라이더가 사는 규칙을 찾아보세요.":
+    "The H at the end of the notation stands for hexagonal. It uses the same layout as Golly, so hexagonal patterns from there work as they are. Change the dots and look for a hexagonal rule where gliders live.",
+  "세 박자 진동자": "Period-3 oscillator",
+  "육각 생명에서 세 세대마다 처음 모습으로 돌아오는 작은 진동자예요.": "A small oscillator in Hexagonal Life that returns to its starting shape every three generations.",
+  "육각 글라이더": "Hexagonal glider",
+  "육각 규칙 B245/S3H 에서 10세대마다 두 칸씩 나아가는 글라이더예요. Golly 도움말에 실린 보기예요.":
+    "A glider in the hexagonal rule B245/S3H that moves two cells every 10 generations. It's the example from Golly's help.",
   "14색 순환": "14-color cyclic",
   "데이비드 그리피스": "David Griffeath",
   "무작위로 칠한 판이 저절로 소용돌이로 정리돼요.": "Paint the board at random, and it sorts itself into spirals.",
@@ -437,6 +448,9 @@ export const EN = {
   "agents[{i}]: x·y 는 정수, dir 은 N·E·S·W 가운데 하나여야 해요": "agents[{i}]: x and y must be integers, and dir one of N, E, S or W",
   "rule.number: 0–255 사이 정수여야 해요": "rule.number: must be an integer from 0 to 255",
   "neighborhood: 순환은 moore 나 von-neumann 이에요": "neighborhood: cyclic rules use moore or von-neumann",
+  "neighborhood: Life 계열은 moore 나 hex 예요": "neighborhood: Life-family rules use moore or hex",
+  "rule.birth: 육각 이웃은 0–6 사이 정수의 배열이어야 해요": "rule.birth: with hexagonal neighbors, must be an array of integers from 0 to 6",
+  "rule.survive: 육각 이웃은 0–6 사이 정수의 배열이어야 해요": "rule.survive: with hexagonal neighbors, must be an array of integers from 0 to 6",
   "rule.threshold: 1–{max} 사이 정수여야 해요": "rule.threshold: must be an integer from 1 to {max}",
   "rule.number: 끝없는 격자에서는 홀수 번호(000 → 1)를 쓸 수 없어요": "rule.number: odd numbers (000 → 1) can't be used on an endless grid",
   "rule.transitions: 줄을 {max}개까지 배열로 적어요": "rule.transitions: list up to {max} lines in an array",
