@@ -1,15 +1,22 @@
 // 작은 선 그래프 하나(산 칸 수). 선 1.5px, 마지막 값에 점, 올리면 세로선과 그 세대의 값.
+// 계열마다 낱말이 다르다(개미는 걸음과 칠한 칸): words = { at(세대) → 글, value(수) → 글, aria() → 글 }
 
 import { h, s } from "./dom.js";
 import { t, num } from "../i18n.js";
 
-export function makeSpark() {
+export const LIFE_WORDS = {
+  at: (g) => t("{g}세대", { g: num(g) }),
+  value: (n) => t("산 칸 {n}", { n: num(n) }),
+  aria: () => t("세대마다 산 칸 수"),
+};
+
+export function makeSpark(words = LIFE_WORDS) {
   const W = 300;
   const H = 64;
   const area = s("path", { class: "area" });
   const line = s("path", { class: "line" });
   const cross = s("line", { class: "cross", y1: 0, y2: H, visibility: "hidden" });
-  const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", role: "img", "aria-label": t("세대마다 산 칸 수") }, area, line, cross);
+  const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", role: "img", "aria-label": words.aria() }, area, line, cross);
   // 끝점은 늘어나지 않게 HTML 점으로 얹는다
   const tip = h("span", { class: "spark-tip", "aria-hidden": "true" });
   const left = h("span");
@@ -17,7 +24,9 @@ export function makeSpark() {
   const el = h("div", {}, h("div", { class: "spark" }, svg, tip), h("div", { class: "spark-label" }, left, right));
   let data = [];
   let start = 0;
+  let marks = null; // 기록마다 몇 세대의 값인지(없으면 start 부터 한 세대씩)
   let hoverX = null;
+  const genAt = (i) => (marks ? (marks[i] ?? marks[marks.length - 1] ?? 0) : start + i);
 
   function render() {
     // 값이 하나뿐이면 가로줄로 그린다
@@ -35,15 +44,15 @@ export function makeSpark() {
     tip.style.top = `${(Y(pts[n - 1] ?? 0) / H) * 100}%`;
     const last = Math.max(0, data.length - 1);
     if (hoverX === null) {
-      left.textContent = t("{g}세대", { g: num(start) });
-      right.textContent = t("{g}세대", { g: num(start + last) });
+      left.textContent = words.at(genAt(0));
+      right.textContent = words.at(genAt(last));
     } else {
       const i = Math.max(0, Math.min(last, Math.round((hoverX / W) * last)));
       const x = data.length === 1 ? hoverX : X(i);
       cross.setAttribute("x1", x);
       cross.setAttribute("x2", x);
-      left.textContent = t("{g}세대", { g: num(start + i) });
-      right.textContent = t("산 칸 {n}", { n: num(data[i] ?? 0) });
+      left.textContent = words.at(genAt(i));
+      right.textContent = words.value(data[i] ?? 0);
     }
   }
 
@@ -62,9 +71,16 @@ export function makeSpark() {
   render();
   return {
     el,
+    /** from: 첫 값의 세대, 또는 값마다의 세대 목록(world.marks) */
     update(values, from) {
       data = values;
-      start = from;
+      if (Array.isArray(from)) {
+        marks = from;
+        start = from[0] ?? 0;
+      } else {
+        marks = null;
+        start = from;
+      }
       render();
     },
   };

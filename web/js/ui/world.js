@@ -20,6 +20,7 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
     origin: null,
     alive: [0],
     changed: [0],
+    marks: [0], // 기록마다 몇 세대(걸음)의 값인지. 한 번에 여러 걸음을 넘기면 띄엄띄엄 늘어난다
     start: 0, // alive[0] 이 몇 세대의 값인지
     region: regionAt(0, 0, 64, 48), // 마지막으로 뿌린 자리
 
@@ -97,6 +98,7 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
       W.gen = 0;
       W.alive = [S.alive];
       W.changed = [0];
+      W.marks = [0];
       W.start = 0;
     },
 
@@ -108,18 +110,20 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
       } else W.alive[W.alive.length - 1] = S.alive;
     },
 
-    /** 한 번 넘긴다. 돌릴 수 없으면(막힌 규칙, 너무 넓음) 거짓 */
-    step() {
+    /** n 번(기본 1) 넘기고 기록을 하나 남긴다. 돌릴 수 없으면(막힌 규칙, 너무 넓음) 거짓 */
+    step(n = 1) {
       if (!S.canRun() || S.full) return false;
       if (W.gen === 0) W.origin = S.snapshot();
-      const res = S.step();
+      const res = S.step(n);
       if (!res) return false;
       W.gen += res.steps;
       W.alive.push(res.alive);
       W.changed.push(res.changed);
+      W.marks.push(W.gen);
       if (W.alive.length > keep) {
         W.alive.shift();
         W.changed.shift();
+        W.marks.shift();
         W.start++;
       }
       return true;

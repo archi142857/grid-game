@@ -1,10 +1,11 @@
 // 정해진 빠르기(세대/초)로 한 세대씩 넘기고, 세대 사이를 부드럽게 이어 그린다.
 // draw(t): t 는 방금 넘긴 세대로 넘어가는 진행도(0–1). 빠르게 돌 때와 '움직임 줄이기'에서는 늘 1.
 // 화면 한 장에 12ms 넘게 쓰지 않는다(넘으면 그 장면에서는 남은 세대를 버린다).
+// batch() 가 참이면 그 장면에 갈 만큼을 step(n) 한 번으로 몰아 넘긴다(개미처럼 1초에 수천 걸음 가는 계열).
 
 import { reducedMotion } from "./dom.js";
 
-export function makeLoop({ step, draw, rate }) {
+export function makeLoop({ step, draw, rate, batch = () => false }) {
   let raf = 0;
   let running = false;
   let last = 0;
@@ -26,14 +27,20 @@ export function makeLoop({ step, draw, rate }) {
       let n = Math.floor(acc);
       acc -= n;
       const t0 = performance.now();
-      while (n-- > 0) {
-        step();
-        did++;
-        if (performance.now() - t0 > 12) {
-          acc = 0;
-          break;
+      if (batch()) {
+        if (n > 0) {
+          step(n);
+          did = n;
         }
-      }
+      } else
+        while (n-- > 0) {
+          step();
+          did++;
+          if (performance.now() - t0 > 12) {
+            acc = 0;
+            break;
+          }
+        }
       if (did) {
         stepAt = now;
         // 한 장면에 한 세대씩 갈 때만 사이를 잇는다

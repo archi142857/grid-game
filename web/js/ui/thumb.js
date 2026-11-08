@@ -1,8 +1,9 @@
 // 작은 격자 그림: 늘 같은 씨앗에서 몇 세대 넘긴 모습으로 서 있다가, 올리거나 고르면 움직인다.
-// 도감 칸과 '다른 규칙 써 보기' 칸이 함께 쓴다. 그림은 작은 판의 맞은편 가장자리를 이어 붙여(토러스) 늘 판이 꽉 찬 채로 돌린다.
+// 도감 칸과 '다른 규칙 써 보기' 칸이 함께 쓴다. Life 계열 그림은 작은 판의 맞은편 가장자리를 이어 붙여(토러스) 늘 판이 꽉 찬 채로 돌린다.
+// 다른 계열(개미·1차원·조건표)은 끝없는 격자의 sim 을 그만큼 돌린 모습을 판에 꼭 맞게 보인다.
 
 import { h, reducedMotion } from "./dom.js";
-import { seedOf } from "./world.js";
+import { makeWorld, regionAt, seedOf } from "./world.js";
 import { makeBoard } from "./board.js";
 import { makeLoop } from "./loop.js";
 import { boardColors } from "./theme.js";
@@ -11,7 +12,11 @@ import { makeTable, stepLife } from "../core/life.js";
 import { makeRng } from "../core/rng.js";
 import { lifeRule } from "../core/rules.js";
 
-export function makeThumb(rule, { w = 26, h: hh = 26, gens = 30, key = rule.id, rate = 8 } = {}) {
+export function makeThumb(rule, opts = {}) {
+  return rule.family && rule.family !== "life" ? makeSimThumb(rule, opts) : makeLifeThumb(rule, opts);
+}
+
+function makeLifeThumb(rule, { w = 26, h: hh = 26, gens = 30, key = rule.id, rate = 8 } = {}) {
   const canvas = h("canvas", { "aria-hidden": "true" });
   const grid = makeGrid(w, hh);
   const table = makeTable(lifeRule(rule));
@@ -42,6 +47,55 @@ export function makeThumb(rule, { w = 26, h: hh = 26, gens = 30, key = rule.id, 
     },
     draw,
     rate: () => rate,
+  });
+  const recolor = () => {
+    board.setColors(boardColors(rule.states, rule.family));
+    draw(1);
+  };
+  recolor();
+  return {
+    canvas,
+    recolor,
+    play: () => !reducedMotion() && loop.start(),
+    pause: () => loop.stop(),
+    destroy: () => {
+      loop.cancel();
+      board.disconnect();
+    },
+  };
+}
+
+/** 계열마다 그림의 처음 걸음 수와 빠르기(1초에). 개미는 한 장면에 몰아 넘긴다 */
+const SIM_THUMB = { ant: { gens: 6000, rate: 600, batch: true }, elementary: { gens: 48, rate: 16 }, table: { gens: 0, rate: 8 } };
+
+function makeSimThumb(rule, { gens, key = rule.id, rate } = {}) {
+  const d = SIM_THUMB[rule.family] ?? { gens: 30, rate: 8 };
+  const first = gens ?? d.gens;
+  const speed = rate ?? d.rate;
+  const canvas = h("canvas", { "aria-hidden": "true" });
+  const world = makeWorld(rule, { keep: 2 });
+  const region = regionAt(0, 0, 24, 24);
+  let seed = seedOf(key);
+  const reset = (n) => {
+    seed = n >>> 0;
+    world.reseed(seed, region);
+    if (first) world.step(first);
+  };
+  reset(seed);
+  const board = makeBoard(canvas, { onResize: () => draw(1) });
+  // 칠한 곳(과 개미)이 모두 보이게 맞춘다
+  function draw(q) {
+    const b = world.bounds();
+    if (b) board.fit({ x0: b.x0 - 1, y0: b.y0 - 1, x1: b.x1 + 1, y1: b.y1 + 1 }, { fill: 0.94, zmax: 8 });
+    board.draw(world, { t: q });
+  }
+  const loop = makeLoop({
+    step: (n = 1) => {
+      if (!world.step(n)) reset(seed + 1);
+    },
+    draw,
+    rate: () => speed,
+    batch: () => !!d.batch,
   });
   const recolor = () => {
     board.setColors(boardColors(rule.states, rule.family));

@@ -3,8 +3,6 @@
 
 import { h } from "./dom.js";
 import { t } from "../i18n.js";
-import { formatNotation } from "../core/life.js";
-import { lifeRule } from "../core/rules.js";
 
 let uid = 0;
 
@@ -88,9 +86,10 @@ export function makeRulePad({ onToggle, onLocked = null }) {
 
 /**
  * 표기 입력(점 글꼴로 크게). Enter 나 칸 벗어나기로 적용, Esc 로 되돌린다.
- * onCommit(text) 이 true 면 적용, 글이면 그 글을 틀린 까닭으로 보이고, 거짓이면 읽을 수 없는 표기
+ * onCommit(text) 이 true 면 적용, 글이면 그 글을 틀린 까닭으로 보이고, 거짓이면 읽을 수 없는 표기(bad 의 글)
+ * update(code) 의 code 가 null 이면(표기가 없는 규칙, 터마이트 등) 칸을 숨긴다
  */
-export function makeNotationField({ onCommit, label = t("규칙 표기") }) {
+export function makeNotationField({ onCommit, label = t("규칙 표기"), bad = () => t("읽을 수 없는 표기예요. 예: B3/S23, B2/S/C3, 23/3") }) {
   const id = `nt-${++uid}`;
   const input = h("input", {
     id,
@@ -111,7 +110,7 @@ export function makeNotationField({ onCommit, label = t("규칙 표기") }) {
       return true;
     }
     const ok = onCommit(text);
-    err.textContent = ok === true ? "" : typeof ok === "string" ? ok : t("읽을 수 없는 표기예요. 예: B3/S23, B2/S/C3, 23/3");
+    err.textContent = ok === true ? "" : typeof ok === "string" ? ok : bad();
     return ok === true;
   };
   input.addEventListener("keydown", (e) => {
@@ -127,10 +126,13 @@ export function makeNotationField({ onCommit, label = t("규칙 표기") }) {
   input.addEventListener("change", commit);
   const fit = () => (input.style.width = `${Math.max(6, input.value.length + 0.6)}ch`);
   input.addEventListener("input", fit);
+  const el = h("div", { class: "notation" }, h("label", { for: id }, label), input, err);
   return {
-    el: h("div", { class: "notation" }, h("label", { for: id }, label), input, err),
-    update(rule, { edited = false } = {}) {
-      current = formatNotation(lifeRule(rule));
+    el,
+    /** code: 지금 규칙의 표기(B3/S23, LLRR, W30). null 이면 칸을 숨긴다 */
+    update(code, { edited = false } = {}) {
+      el.hidden = code == null;
+      current = code ?? "";
       if (document.activeElement !== input) input.value = current;
       if (input.value.trim().toUpperCase() === current) err.textContent = "";
       input.classList.toggle("edited", edited);

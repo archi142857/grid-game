@@ -3,7 +3,7 @@
 import { h, clear, reducedMotion, setTitle } from "../ui/dom.js";
 import { t, num } from "../i18n.js";
 import { formatNotation, neighborCells, liveNeighbors, makeTable, stepLife, explain } from "../core/life.js";
-import { lifeRule } from "../core/rules.js";
+import { lifeRule, formatCode } from "../core/rules.js";
 import { randomSeed } from "../core/rng.js";
 import { makeWorld, regionAt } from "../ui/world.js";
 import { makeBoard } from "../ui/board.js";
@@ -17,12 +17,25 @@ import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { shortName, creditOf, tagOf, SOON } from "../data/catalog.js";
 
 const copy = (o) => structuredClone(o);
-// 도감 그림은 늘 같은 씨앗에서 이만큼 넘긴 모습으로 서 있다
-const THUMB_GENS = { "conway-life": 40, highlife: 40, seeds: 11, "day-and-night": 60, maze: 34, "brians-brain": 14, "star-wars": 22 };
+// 도감 그림은 늘 같은 씨앗에서 이만큼 넘긴 모습으로 서 있다(개미는 걸음 수. 없으면 계열마다 정한 만큼)
+const THUMB_GENS = {
+  "conway-life": 40,
+  highlife: 40,
+  seeds: 11,
+  "day-and-night": 60,
+  maze: 34,
+  "brians-brain": 14,
+  "star-wars": 22,
+  "langtons-ant": 11500,
+  "ant-llrr": 8000,
+  "ant-lrrrrrllr": 16000,
+  "fibonacci-turmite": 3000,
+};
 
 export function homeView(main, { presets }) {
   setTitle(null);
-  const hero = makeHero(presets);
+  // 첫 화면 위쪽(칩·숫자 점)은 Life 계열만. 다른 계열은 도감에서 만난다
+  const hero = makeHero(presets.filter((p) => p.family === "life"));
   const lesson = makeLesson();
   const shelf = makeShelf(presets);
   main.append(h("div", { class: "wrap" }, hero.el, lesson.el, shelf.el));
@@ -480,7 +493,7 @@ function makeLesson() {
 function makeShelf(presets) {
   const thumbs = [];
   const items = presets.map((p) => {
-    const th = makeThumb(p, { gens: THUMB_GENS[p.id] ?? 30 });
+    const th = makeThumb(p, { gens: THUMB_GENS[p.id] });
     thumbs.push(th);
     const credit = creditOf(p.id);
     return h(
@@ -495,7 +508,7 @@ function makeShelf(presets) {
             "span",
             { class: "spec-text" },
             h("span", { class: "spec-name" }, p.name),
-            h("span", { class: "spec-code code" }, formatNotation(lifeRule(p))),
+            h("span", { class: "spec-code code" }, formatCode(p) ?? ""),
             h("span", { class: "spec-meta" }, credit || t("만든 사람은 알려지지 않았어요")),
           ),
         ),

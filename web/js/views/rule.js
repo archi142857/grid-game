@@ -1,10 +1,11 @@
 // 규칙 화면: 끝없는 격자를 크게 돌리며 규칙을 고친다. 도감 규칙(#/r/<id>)과 만들기(#/make)가 함께 쓴다.
 // 왼쪽은 격자와 재생, 오른쪽은 규칙·기록·더 보기. 고급 설정은 '더 보기' 안에만 둔다.
+// 계열(Life·개미 …)마다 다른 것(편집기·표기·손·빠르기·낱말·살펴보기 글)은 ui/families.js 가 맡는다.
+// 만들기는 계열부터 고른다(#/make?family=ant, 또는 ?rule=LLRR 처럼 그 계열 표기).
 
 import { h, icon, ICON, setTitle, reducedMotion } from "../ui/dom.js";
 import { t, num } from "../i18n.js";
-import { formatNotation, parseNotation, MAX_STATES } from "../core/life.js";
-import { checkRuleFile, toRuleFile, formatRuleFile, resizeStates, lifeRule, sameRule } from "../core/rules.js";
+import { checkRuleFile, toRuleFile, formatRuleFile, resizeStates, sameRule, parseCode, formatCode, lockOf } from "../core/rules.js";
 import { parseRLE } from "../core/rle.js";
 import { randomSeed } from "../core/rng.js";
 import { makeWorld, regionAt } from "../ui/world.js";
@@ -12,92 +13,44 @@ import { makeBoard } from "../ui/board.js";
 import { makeLoop, makePainter } from "../ui/loop.js";
 import { attachNav } from "../ui/nav.js";
 import { boardColors } from "../ui/theme.js";
-import { makeRulePad, makeNotationField, describeRule, blockedReason } from "../ui/rulepad.js";
+import { makeNotationField, blockedReason } from "../ui/rulepad.js";
 import { segmented, paragraphs, zoomControls, flashLine, makeCapsule, makeFullscreen } from "../ui/widgets.js";
 import { makeSpark } from "../ui/spark.js";
 import { patternArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { load, save } from "../ui/store.js";
+import { FAMILY, SCREEN_FAMILIES } from "../ui/families.js";
 import { entryOf, tagOf, MORE_RULES, MAKE_TIPS } from "../data/catalog.js";
 import { crumb } from "./common.js";
 
 const copy = (o) => structuredClone(o);
-const SPEEDS = [
-  { id: "slow", n: 4, name: () => t("느리게") },
-  { id: "normal", n: 10, name: () => t("보통") },
-  { id: "fast", n: 30, name: () => t("빠르게") },
-];
-const ZOOM = 10; // 처음 칸 한 변(css px)
 
-const WHY = {
-  born: (n) => t("태어남에 {n:이가} 있어요", { n }),
-  stay: (n) => t("태어남에 {n:이가} 없어요", { n }),
-  survive: (n) => t("살아남음에 {n:이가} 있어요", { n }),
-  die: (n) => t("살아남음에 {n:이가} 없어요", { n }),
-  fade: (n) => t("살아남음에 {n:이가} 없어 사라지기 시작해요", { n }),
-  fading: () => t("사라지는 중이라 한 단계 더 흐려져요"),
-  gone: () => t("마지막 단계라 빈칸이 돼요"),
-};
-const ROW_OF = { born: "birth", stay: "birth", survive: "survive", die: "survive", fade: "survive" };
-
-const TOOL_TIP = {
-  pan: () => t("끌어서 둘러보고, 칸을 눌러 살리거나 비워요. 휠이나 두 손가락으로 확대·축소해요."),
-  draw: () => t("끌어서 칸을 그려요. 산 칸에서 시작하면 지워요. 둘러보려면 오른쪽 단추나 두 손가락으로 끌어요."),
-  look: () => t("칸에 커서를 올리거나 눌러 보세요. 이웃을 세고 다음 세대를 알려 줘요."),
+/** 끝없는 격자에서 돌릴 수 없는 까닭(core/rules.js 의 lockOf 낱말) → 화면 글 */
+const LOCK_TEXT = {
+  birth0: () => blockedReason({ birth: [0] }),
+  odd: () => t("끝없는 격자에서는 홀수 번호를 쓸 수 없어요. 000 이 켜지면 빈 곳이 끝없이 한꺼번에 켜지거든요."),
+  empty: () => t("끝없는 격자에서는 이웃이 없는 빈칸이 바뀌는 줄을 쓸 수 없어요. 빈 곳이 끝없이 한꺼번에 바뀌거든요."),
 };
 
-/** 8 이웃 자리 */
-const around = (x, y) => [
-  [x - 1, y - 1],
-  [x, y - 1],
-  [x + 1, y - 1],
-  [x - 1, y],
-  [x + 1, y],
-  [x - 1, y + 1],
-  [x, y + 1],
-  [x + 1, y + 1],
-];
-
-/** 규칙에 표기만 바꿔 씌운 것(그림용) */
-function withNotation(rule, code) {
-  const p = parseNotation(code);
-  const r = structuredClone(rule);
-  r.birth = p.birth;
-  r.survive = p.survive;
-  r.states = resizeStates(r.states, p.states);
-  return r;
-}
-
-/** 만들기 화면의 처음 규칙 */
-function blankRule() {
-  return {
-    id: "my-rule",
-    name: t("내 규칙"),
-    description: "",
-    family: "life",
-    grid: { edges: "infinite" },
-    neighborhood: "moore",
-    states: [{ name: t("빈칸") }, { name: t("산 칸") }],
-    birth: [3],
-    survive: [2, 3],
-    seed: { type: "random", density: 0.3 },
-  };
-}
+/** 계열마다 만들기 화면의 처음 글 */
+const MAKE_LEAD = {
+  life: () => t("점을 눌러 규칙을 정하고, 칸을 그려 시작 모습을 만들어요. 마음에 들면 규칙 파일로 내려받으세요."),
+  ant: () => t("글자를 눌러 칸 색마다 도는 쪽을 정하고, 개미 손으로 개미를 놓아요. 마음에 들면 규칙 파일로 내려받으세요."),
+};
 
 export function ruleView(main, { preset = null, params = {} } = {}) {
   const make = !preset;
-  const base = make ? blankRule() : preset;
+  // 주소의 ?rule=B36/S23 · LLRR 로 시작할 수 있다(고친 규칙을 주소로 나눈다). 만들기는 표기의 계열을 따른다
+  const fromUrl = params.rule ? parseCode(params.rule) : null;
+  const famId = make ? (fromUrl && FAMILY[fromUrl.family] ? fromUrl.family : FAMILY[params.family] ? params.family : "life") : preset.family;
+  const fam = FAMILY[famId] ?? FAMILY.life;
+  const base = make ? fam.blank() : preset;
   const entry = make ? null : entryOf(preset.id);
   let rule = copy(base);
-  // 주소의 ?rule=B36/S23 으로 시작할 수 있다(고친 규칙을 주소로 나눈다)
-  const fromUrl = params.rule ? parseNotation(params.rule) : null;
-  if (fromUrl && !fromUrl.birth.includes(0)) {
-    rule.birth = fromUrl.birth;
-    rule.survive = fromUrl.survive;
-    rule.states = resizeStates(rule.states, fromUrl.states);
-  }
+  if (fromUrl && fromUrl.family === fam.id && !lockOf(fromUrl)) rule = fam.withCode(rule, fromUrl);
   setTitle(make ? t("새 규칙") : preset.name);
 
+  const SPEEDS = fam.speeds();
   let speed = SPEEDS.find((x) => x.id === load("speed", "normal")) ?? SPEEDS[1];
   let tool = "pan";
   let look = null; // 눌러서 고정한 칸 [x, y]
@@ -106,9 +59,10 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   const world = makeWorld(rule);
   const thumbs = [];
+  const words = fam.words;
 
   // ── 격자 ─────────────────
-  const canvas = h("canvas", { role: "img", "aria-label": t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 살리거나 비워요") });
+  const canvas = h("canvas", { role: "img", "aria-label": fam.canvasLabel() });
   const peek = h("div", { class: "peek", hidden: true, "aria-live": "polite" });
   const hint = h("p", { class: "stage-hint", hidden: true });
   const flash = flashLine();
@@ -116,7 +70,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   // 전체 화면에서만 보이는 세대·산 칸
   const statGen = h("b", {}, "0");
   const statPop = h("b", {}, "0");
-  const stats = h("p", { class: "stage-stats" }, h("span", {}, t("세대")), statGen, h("span", {}, t("산 칸")), statPop);
+  const stats = h("p", { class: "stage-stats" }, h("span", {}, words.step()), statGen, h("span", {}, words.count()), statPop);
   const stage = h("div", { class: "stage", dataset: { tool } }, canvas, peek, hint, stats, flash.el, zoom.el);
   const board = makeBoard(canvas, { onResize: () => ready() });
 
@@ -131,53 +85,46 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   const speedSeg = segmented({
     label: t("빠르기"),
     value: speed.id,
-    options: SPEEDS.map((x) => ({ id: x.id, name: x.name(), title: t("1초에 {n}세대", { n: x.n }) })),
+    options: SPEEDS.map((x) => ({ id: x.id, name: x.name, title: x.title })),
     onChange: (id) => {
       speed = SPEEDS.find((x) => x.id === id) ?? speed;
       save("speed", id);
     },
   });
-  const toolSeg = segmented({
-    label: t("손"),
-    value: tool,
-    options: [
-      { id: "pan", icon: icon(ICON.move), name: t("이동"), title: t("이동: 끌어서 둘러보기") },
-      { id: "draw", icon: icon(ICON.pen), name: t("그리기"), title: t("그리기: 끌어서 칸 그리기") },
-      { id: "look", icon: icon(ICON.eye), name: t("살펴보기"), title: t("살펴보기: 칸의 이웃과 다음 세대") },
-    ],
-    onChange: (id) => setTool(id),
-  });
+  const toolSeg = segmented({ label: t("손"), value: tool, options: fam.tools(), onChange: (id) => setTool(id) });
   const status = h("p", { class: "status" });
 
   // ── 오른쪽: 규칙 ─────────────────
   const restoreBtn = h("button", { class: "text-btn", type: "button", hidden: true, onclick: () => restore() }, t("원래대로"));
-  const pad = makeRulePad({ onToggle: (kind, n) => toggleCount(kind, n), onLocked: (why) => (say.textContent = why) });
   const say = h("p", { class: "say" });
-  const notation = makeNotationField({ onCommit: (text) => setNotation(text) });
+  const editor = fam.editor({ get: () => rule, set: (r) => setRule(r), locked: (why) => (say.textContent = why) });
+  const notation = makeNotationField({ onCommit: (text) => setCode(text), bad: fam.codeBad });
 
   // ── 오른쪽: 기록 ─────────────────
   const genNum = h("b", { class: "num" }, "0");
   const popNum = h("b", { class: "num" }, "0");
   const chgNum = h("b", { class: "num" }, "0");
-  const spark = makeSpark();
+  const spark = makeSpark(words);
 
   // ── 오른쪽: 더 보기 ─────────────────
   const statesOut = h("output", {}, "2");
-  const statesField = h(
-    "div",
-    { class: "stepper", role: "group", "aria-label": t("상태 수") },
-    h(
-      "button",
-      { class: "btn small square", type: "button", "aria-label": t("상태 하나 빼기"), onclick: () => setStates(rule.states.length - 1) },
-      icon(ICON.minus),
-    ),
-    statesOut,
-    h(
-      "button",
-      { class: "btn small square", type: "button", "aria-label": t("상태 하나 더하기"), onclick: () => setStates(rule.states.length + 1) },
-      icon(ICON.plus),
-    ),
-  );
+  const statesField = fam.states
+    ? h(
+        "div",
+        { class: "stepper", role: "group", "aria-label": fam.states.label() },
+        h(
+          "button",
+          { class: "btn small square", type: "button", "aria-label": t("상태 하나 빼기"), onclick: () => setStates(rule.states.length - 1) },
+          icon(ICON.minus),
+        ),
+        statesOut,
+        h(
+          "button",
+          { class: "btn small square", type: "button", "aria-label": t("상태 하나 더하기"), onclick: () => setStates(rule.states.length + 1) },
+          icon(ICON.plus),
+        ),
+      )
+    : null;
   const errs = h("ul", { class: "errs", role: "status" });
   const fileIn = h("input", { type: "file", accept: ".json,application/json", hidden: true });
   fileIn.addEventListener("change", async () => {
@@ -194,7 +141,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       "section",
       { class: "side-sec", "aria-labelledby": "rule-t" },
       h("div", { class: "side-head" }, h("h2", { id: "rule-t" }, t("규칙")), restoreBtn),
-      pad.el,
+      editor.el,
       say,
     ),
     h(
@@ -203,8 +150,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       h(
         "div",
         { class: "readouts" },
-        h("div", { class: "readout" }, h("span", {}, t("세대")), genNum),
-        h("div", { class: "readout" }, h("span", {}, t("산 칸")), popNum),
+        h("div", { class: "readout" }, h("span", {}, words.step()), genNum),
+        h("div", { class: "readout" }, h("span", {}, words.count()), popNum),
         h("div", { class: "readout" }, h("span", {}, t("바뀐 칸")), chgNum),
       ),
       spark.el,
@@ -216,7 +163,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       h(
         "div",
         { class: "more-body" },
-        field(t("상태 수"), statesField, h("span", { class: "field-label" }, t("3 이상이면 죽는 칸이 그만큼 단계를 거쳐 사라져요."))),
+        statesField ? field(fam.states.label(), statesField, h("span", { class: "field-label" }, fam.states.note())) : null,
         field(
           t("규칙 파일"),
           h(
@@ -233,6 +180,19 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   );
 
   // ── 머리와 본문 ─────────────────
+  // 만들기는 계열부터 고른다. 고르면 그 계열의 만들기 화면으로 간다
+  const famSeg =
+    make && SCREEN_FAMILIES.length > 1
+      ? segmented({
+          label: t("계열"),
+          cls: "seg fam-seg",
+          value: fam.id,
+          options: SCREEN_FAMILIES.map((id) => ({ id, name: FAMILY[id].label() })),
+          onChange: (id) => {
+            if (id !== fam.id) location.hash = `#/make?family=${id}`;
+          },
+        })
+      : null;
   const head = h(
     "div",
     { class: "rule-head" },
@@ -240,49 +200,71 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       "div",
       {},
       h("h1", {}, make ? t("새 규칙") : preset.name),
-      h("p", {}, make ? t("점을 눌러 규칙을 정하고, 칸을 그려 시작 모습을 만들어요. 마음에 들면 규칙 파일로 내려받으세요.") : tagOf(preset)),
+      h("p", {}, make ? (MAKE_LEAD[fam.id] ?? MAKE_LEAD.life)() : tagOf(preset)),
+      famSeg ? famSeg.el : null,
     ),
     notation.el,
   );
 
-  const notes = make
-    ? [
-        h(
-          "section",
-          { class: "notes" },
-          h("h2", {}, t("요령")),
-          h(
-            "ul",
-            { class: "tips" },
-            MAKE_TIPS().map((x) => h("li", {}, x)),
-          ),
-        ),
-        h(
-          "section",
-          { class: "notes" },
-          h("h2", {}, t("다른 규칙 써 보기")),
-          h(
-            "ul",
-            { class: "cards" },
-            MORE_RULES().map((x) => card({ kind: "rule", ...x })),
-          ),
-        ),
-      ]
-    : [
-        h("section", { class: "notes" }, h("h2", {}, t("이 규칙은")), h("div", { class: "body" }, paragraphs(entry ? entry.about() : [preset.description]))),
-        entry && entry.watch().length
-          ? h(
-              "section",
-              { class: "notes" },
-              h("h2", {}, t("볼 것")),
-              h(
-                "ul",
-                { class: "cards" },
-                entry.watch().map((x) => card(x)),
-              ),
-            )
-          : null,
-      ];
+  const notes = make ? makeNotes() : presetNotes();
+
+  function makeNotes() {
+    const tips = fam.id === "life" ? MAKE_TIPS() : [];
+    // 다른 규칙 써 보기: Life 는 모아 둔 규칙, 다른 계열은 그 계열 도감 글의 '볼 것' 가운데 규칙 바꾸기
+    const more =
+      fam.id === "life"
+        ? MORE_RULES().map((x) => ({ kind: "rule", ...x }))
+        : uniqueBy(
+            (FAMILY_ENTRIES[fam.id] ?? [])
+              .flatMap((id) => entryOf(id)?.watch() ?? [])
+              .filter((x) => x.kind === "rule"),
+            (x) => x.notation,
+          );
+    return [
+      tips.length
+        ? h(
+            "section",
+            { class: "notes" },
+            h("h2", {}, t("요령")),
+            h(
+              "ul",
+              { class: "tips" },
+              tips.map((x) => h("li", {}, x)),
+            ),
+          )
+        : null,
+      more.length
+        ? h(
+            "section",
+            { class: "notes" },
+            h("h2", {}, t("다른 규칙 써 보기")),
+            h(
+              "ul",
+              { class: "cards" },
+              more.map((x) => card(x)),
+            ),
+          )
+        : null,
+    ];
+  }
+
+  function presetNotes() {
+    return [
+      h("section", { class: "notes" }, h("h2", {}, t("이 규칙은")), h("div", { class: "body" }, paragraphs(entry ? entry.about() : [preset.description]))),
+      entry && entry.watch().length
+        ? h(
+            "section",
+            { class: "notes" },
+            h("h2", {}, t("볼 것")),
+            h(
+              "ul",
+              { class: "cards" },
+              entry.watch().map((x) => card(x)),
+            ),
+          )
+        : null,
+    ];
+  }
 
   // 격자와 재생 막대, 손·빠르기를 한 묶음으로. 전체 화면에서는 이 묶음이 화면을 채우고 아래 띠가 된다
   const boardWrap = h(
@@ -319,7 +301,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   );
 
   // ── 돌리기와 그리기 ─────────────────
-  const loop = makeLoop({ step: () => tick(), draw: (p) => render(p), rate: () => speed.n });
+  const loop = makeLoop({ step: (n) => tick(n), draw: (p) => render(p), rate: () => speed.n, batch: () => fam.batch });
   const paint = makePainter(() => render(loop.progress()));
   let sparkAt = 0;
 
@@ -327,38 +309,32 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   function render(p = 1) {
     const lc = lookAt();
-    board.draw(world, { t: p, hover: tool !== "look" ? hover : null, look: lc ? { x: lc[0], y: lc[1], neighbors: around(lc[0], lc[1]) } : null });
+    const ex = lc ? world.explain(lc[0], lc[1]) : null;
+    board.draw(world, { t: p, hover: tool !== "look" ? hover : null, look: lc ? { x: lc[0], y: lc[1], neighbors: fam.lookCells(ex, lc) } : null });
     genNum.textContent = statGen.textContent = num(world.gen);
     popNum.textContent = statPop.textContent = num(world.count);
     chgNum.textContent = num(world.lastChanged);
     const now = performance.now();
     if (!loop.running || now - sparkAt > 250) {
       sparkAt = now;
-      spark.update(world.alive, world.start);
+      spark.update(world.alive, world.marks);
     }
-    hint.hidden = world.count > 0;
-    if (!hint.hidden) hint.textContent = tool === "draw" ? t("끌어서 칸을 그린 다음, 재생을 눌러 보세요.") : t("칸을 눌러 살릴 칸을 고른 다음, 재생을 눌러 보세요.");
-    showPeek(lc);
+    const why = fam.hint(world, tool);
+    hint.hidden = !why;
+    if (why) hint.textContent = why;
+    showPeek(lc, ex);
   }
 
-  function showPeek(lc) {
+  function showPeek(lc, ex) {
     if (!lc) {
       peek.hidden = true;
-      pad.markWhy(null);
+      editor.mark(null);
       return;
     }
     const [x, y] = lc;
-    const ex = world.explain(x, y);
-    const s = ex.now;
-    const n = ex.n;
-    const name = (i) => rule.states[i]?.name ?? String(i);
-    peek.replaceChildren(
-      h("div", { class: "peek-top" }, h("span", { class: "num" }, String(n)), h("span", {}, t("산 이웃"))),
-      h("div", {}, t("지금 "), h("b", {}, name(s)), t(", 다음 세대 "), h("b", {}, name(ex.next))),
-      h("div", {}, WHY[ex.why](n), "."),
-    );
+    peek.replaceChildren(...fam.peek(ex, rule).filter(Boolean));
     peek.hidden = false;
-    pad.markWhy(ROW_OF[ex.why] ?? null, n);
+    editor.mark(ex);
     // 칸 오른쪽 아래에 두되, 무대 밖으로 나가면 반대쪽으로
     const box = board.cellBox(x, y);
     const sw = stage.clientWidth;
@@ -385,15 +361,15 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   function ready() {
     if (!seeded && board.ready) {
       seeded = true;
-      board.setView({ cx: 0, cy: 0, z: canvas.clientWidth < 560 ? 8 : ZOOM });
+      board.setView({ cx: 0, cy: 0, z: canvas.clientWidth < 560 ? 8 : fam.zoom });
       world.reseed(world.seed, viewRegion(0.7));
     }
     zoom.update(board.canZoom());
     render(loop.progress());
   }
 
-  function tick() {
-    if (world.step()) return;
+  function tick(n = 1) {
+    if (world.step(n)) return;
     setRunning(false);
     if (world.full) {
       flash.show(t("너무 넓게 퍼져서 멈췄어요. 흩뿌리기나 비우기로 다시 시작해 보세요."), 6000);
@@ -419,7 +395,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   function goBack() {
     if (world.back()) {
-      status.textContent = TOOL_TIP[tool]();
+      status.textContent = fam.tip[tool]();
       paint();
     }
   }
@@ -429,7 +405,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     if (id !== "look") look = null;
     toolSeg.set(id);
     stage.dataset.tool = id;
-    status.textContent = TOOL_TIP[id]();
+    status.textContent = fam.tip[id]();
     paint();
   }
 
@@ -443,7 +419,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   function fitView() {
     const b = world.bounds();
     if (b) board.fit(b, { fill: 0.8, zmax: 24 });
-    else board.setView({ cx: 0, cy: 0, z: ZOOM });
+    else board.setView({ cx: 0, cy: 0, z: fam.zoom });
     zoom.update(board.canZoom());
     paint();
   }
@@ -458,12 +434,13 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
         paint();
         return;
       }
-      world.set(x, y, world.get(x, y) === 1 ? 0 : 1);
+      const note = tool === "ant" ? fam.placeAgent(world, x, y) : fam.tap(world, x, y);
+      if (note) flash.show(note, 2400);
       world.touched();
       paint();
     },
     onStroke([x, y]) {
-      const v = world.get(x, y) === 1 ? 0 : 1;
+      const v = fam.strokeValue(world.get(x, y));
       const put = ([cx, cy]) => {
         world.set(cx, cy, v);
         paint();
@@ -506,63 +483,56 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   }
 
   function syncRule() {
-    const code = formatNotation(lifeRule(rule));
+    const code = formatCode(rule);
     const edited = !make && !sameRule(base, rule);
-    pad.update(rule);
-    notation.update(rule, { edited });
-    say.textContent = describeRule(rule);
+    editor.update(rule);
+    notation.update(code, { edited });
+    say.textContent = fam.describe(rule);
     restoreBtn.hidden = !edited;
     statesOut.textContent = String(rule.states.length);
-    if (make) setTitle(t("{code} 만들기", { code }));
+    if (make) setTitle(code ? t("{code} 만들기", { code }) : t("새 규칙"));
     syncUrl(code);
   }
 
   /** 고친 규칙을 주소에 남긴다(그대로 나눌 수 있게). hashchange 는 일으키지 않는다 */
   function syncUrl(code) {
     const q = new URLSearchParams();
-    if (make || code !== formatNotation(lifeRule(base))) q.set("rule", code);
+    if (code && (make || code !== formatCode(base))) q.set("rule", code);
+    else if (make && fam.id !== "life") q.set("family", fam.id);
     const path = make ? "#/make" : `#/r/${preset.id}`;
     const want = q.toString() ? `${path}?${q}` : path;
     if (location.hash !== want) history.replaceState(null, "", want);
   }
 
-  function toggleCount(kind, n) {
-    const r = copy(rule);
-    const set = new Set(r[kind]);
-    if (set.has(n)) set.delete(n);
-    else set.add(n);
-    r[kind] = [...set].sort((a, b) => a - b);
-    setRule(r);
-  }
-
-  /** 표기를 적용한다. 틀리면 거짓, 돌릴 수 없는 규칙이면 그 까닭 */
-  function setNotation(text) {
-    const p = parseNotation(text);
+  /** 표기를 적용한다. 틀리면 거짓, 쓸 수 없는 표기면 그 까닭 글 */
+  function setCode(text) {
+    const p = parseCode(text);
     if (!p) return false;
-    const why = blockedReason(p);
-    if (why) return why;
-    const r = copy(rule);
-    r.birth = p.birth;
-    r.survive = p.survive;
-    r.states = resizeStates(r.states, p.states);
-    setRule(r);
+    if (p.family !== fam.id) {
+      // 만들기에서는 다른 계열 표기를 치면 그 계열로 간다
+      if (make && FAMILY[p.family]) {
+        location.hash = `#/make?rule=${encodeURIComponent(formatCode(p) ?? text)}`;
+        return true;
+      }
+      return fam.codeOther();
+    }
+    const why = lockOf(p);
+    if (why) return (LOCK_TEXT[why] ?? LOCK_TEXT.birth0)();
+    setRule(fam.withCode(copy(rule), p));
     return true;
   }
 
   function setStates(n) {
-    n = Math.min(MAX_STATES, Math.max(2, n));
+    if (!fam.states) return;
+    n = Math.min(fam.states.max, Math.max(fam.states.min, n));
     if (n === rule.states.length) return;
     const r = copy(rule);
-    r.states = resizeStates(r.states, n);
+    r.states = resizeStates(r.states, n, fam.id);
     setRule(r);
   }
 
   function restore() {
-    const r = copy(rule);
-    r.birth = [...base.birth];
-    r.survive = [...base.survive];
-    r.states = copy(base.states);
-    setRule(r);
+    setRule(fam.restore(rule, base));
   }
 
   function scatter() {
@@ -570,7 +540,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     world.scatter(s.type === "random" ? s.density : 0.3, randomSeed(), viewRegion(0.7));
     look = null;
     flash.hide();
-    status.textContent = TOOL_TIP[tool]();
+    status.textContent = fam.tip[tool]();
     paint();
   }
 
@@ -580,7 +550,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     world.clear();
     look = null;
     flash.hide();
-    status.textContent = TOOL_TIP[tool]();
+    status.textContent = fam.tip[tool]();
     paint();
   }
 
@@ -597,10 +567,14 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     } catch (e) {
       return [t("JSON 으로 읽을 수 없어요: {m}", { m: e.message })];
     }
-    const res = checkRuleFile(obj);
-    if (res.errors) return res.errors;
-    const why = blockedReason(res.rule);
-    if (why) return [why];
+    // 이 화면의 계열만 받는다(다른 계열은 만들기에서 계열을 고른 뒤)
+    const res = checkRuleFile(obj, { families: [fam.id] });
+    if (res.errors) {
+      if (obj && obj.family !== fam.id && FAMILY[obj.family]) return [t("이 화면에서는 {name} 규칙 파일만 불러와요. 만들기에서 계열을 고른 뒤 불러오세요.", { name: fam.label() })];
+      return res.errors;
+    }
+    const why = lockOf(res.rule);
+    if (why) return [(LOCK_TEXT[why] ?? LOCK_TEXT.birth0)()];
     setRule(res.rule, { reseed: true });
     return [];
   }
@@ -622,7 +596,9 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       art = patternArt(parseRLE(x.rle).rows);
       label = t("놓아 보기");
     } else if (x.kind === "rule") {
-      const th = makeThumb(withNotation(base, x.notation), { w: 32, h: 24, gens: 30, key: x.notation });
+      const p = parseCode(x.notation);
+      const r = p && p.family === fam.id ? fam.withCode(copy(base), p) : copy(base);
+      const th = makeThumb(r, { w: 32, h: 24, gens: fam.id === "life" ? 30 : undefined, key: x.notation });
       thumbs.push(th);
       return hoverPlay(
         h(
@@ -666,7 +642,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       paint();
       setRunning(!reducedMotion());
     } else if (x.kind === "rule") {
-      setNotation(x.notation);
+      setCode(x.notation);
       if (!loop.running && !reducedMotion()) setRunning(true);
     } else {
       // 보이는 곳(너무 넓으면 가운데 160×120)만 뒤집는다
@@ -683,6 +659,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   const onScheme = () => {
     recolor();
+    editor.update(rule);
     thumbs.forEach((x) => x.recolor());
   };
   window.addEventListener("schemechange", onScheme);
@@ -734,4 +711,12 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       window.removeEventListener("schemechange", onScheme);
     },
   };
+}
+
+/** 계열마다 만들기 화면의 '다른 규칙 써 보기'를 가져올 도감 규칙 */
+const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"] };
+
+function uniqueBy(list, key) {
+  const seen = new Set();
+  return list.filter((x) => (seen.has(key(x)) ? false : (seen.add(key(x)), true)));
 }
