@@ -479,6 +479,16 @@ export const EN = {
   "태어남 0은 쓸 수 없어요. 끝없는 격자에서는 빈 곳이 모두 한꺼번에 태어나 버리거든요.": "Born 0 isn't allowed: on an endless grid, all the empty space would come alive at once.",
   "살아남음에 0부터 8까지 모두 넣으면 산 칸은 죽지 않아요.": "Put every number from 0 to 8 in Survive, and live cells never die.",
   "상태 수를 3 이상으로 올리면 죽는 칸이 몇 세대 동안 꼬리처럼 남아요.": "Raise the number of states to 3 or more, and dying cells linger like tails for a few generations.",
+  "RL 이 랭턴의 개미예요. 1만 걸음쯤 지나야 고속도로가 나오니 빠르게로 돌려 보세요.": "RL is Langton's ant. The highway only shows up after about 10,000 steps, so try it on Fast.",
+  "LL, RR 처럼 같은 글자를 둘씩 짝지으면(LLRR, LRRL …) 그림이 몇 번이고 다시 대칭이 돼요.": "Pair up identical letters, like LL and RR (LLRR, LRRL …), and the drawing becomes symmetric over and over again.",
+  "N(곧장)과 U(뒤로)도 섞어 보세요. 글자 수가 같아도 개미가 전혀 다르게 움직여요.": "Mix in N (straight) and U (back) too. Even with the same number of letters, the ant moves in a completely different way.",
+  "개미를 여러 마리 놓아 보세요. 놓은 차례대로 한 걸음씩 움직이며 서로의 길을 바꿔 놓아요.": "Try placing several ants. They take turns one step at a time, in the order you placed them, and change each other's paths.",
+  "그리기 손으로 칸을 미리 칠해 두면 개미가 다른 길로 가요.": "Paint some cells first with the Draw tool, and the ant takes a different path.",
+  "번호는 이웃 무늬 여덟 개(111 … 000)마다 다음 칸이 켜지는지를 1·0 으로 적어 이진수로 읽은 수예요. 무늬를 눌러 바꾸면 번호도 바뀌어요.": "The number is what you get by writing 1 or 0 for whether the next cell turns on for each of the eight neighbor patterns (111 … 000) and reading it as a binary number. Change a pattern and the number changes too.",
+  "홀수 번호는 쓸 수 없어요. 셋 다 꺼진 곳(000)에서도 켜져서, 빈 곳이 끝없이 한꺼번에 켜지거든요.": "Odd numbers can't be used: they turn on even where all three cells are off (000), so all the empty space would turn on at once.",
+  "가운데 한 칸에서 시작하면 규칙마다 전혀 다른 무늬가 나와요. 흩뿌리기로 첫 줄을 채우면 규칙의 성격이 더 잘 보여요.": "Starting from a single cell in the middle, each rule makes a completely different pattern. Fill the first row with Scatter to see a rule's character more clearly.",
+  "줄은 위에서부터 보고, 처음 맞는 줄을 써요. 맞는 줄이 없으면 칸은 그대로예요.": "Lines are checked from the top, and the first one that matches is used. If none match, the cell stays as it is.",
+  "와이어월드에서 도선은 이웃 전자 머리가 1개나 2개일 때만 머리가 돼요. 이 수를 바꾸면 회로가 어떻게 달라지는지 보세요.": "In Wireworld, a wire becomes a head only when 1 or 2 of its neighbors are electron heads. Change those numbers and see how the circuits behave.",
 
   // ── core/rules.js: 규칙 파일 검사 ─────────────────────────────
   "규칙 파일은 { } 로 감싼 JSON 이어야 해요": "A rule file must be JSON wrapped in { }",

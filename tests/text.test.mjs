@@ -234,3 +234,10 @@ test("코드 규칙 글: 도움말·예시 설명이 있고, 오류마다 한 �
   const noText = kinds.filter((k) => !errors.some((e) => e.kind === k));
   if (noText.length) tt.diagnostic(`글이 없는 코드 오류 종류: ${noText.join(", ")}`);
 });
+
+test("만들기 요령: 계열마다 있고, 인자가 없으면 생명 게임 요령이다", async () => {
+  const { MAKE_TIPS } = await import("../web/js/data/catalog.js");
+  for (const f of ["life", "ant", "elementary", "table"]) assert.ok(MAKE_TIPS(f).length > 0, f);
+  assert.deepEqual(MAKE_TIPS(), MAKE_TIPS("life"));
+  assert.deepEqual(MAKE_TIPS("없는 계열"), []);
+});
