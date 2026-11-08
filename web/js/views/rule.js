@@ -404,7 +404,10 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   function setRunning(on) {
     if (on && !world.canRun()) on = false;
     if (on) loop.start();
-    else loop.stop();
+    else {
+      loop.stop();
+      paint(); // 도는 동안 기록 그래프는 0.25초에 한 번만 고치니, 멈출 때 마지막 세대까지 맞춰 그린다
+    }
     capsule.setPlaying(on);
   }
 

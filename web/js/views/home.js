@@ -251,7 +251,11 @@ function makeHero(presets) {
       hover = c;
       paint();
     },
-    onHint: () => flash.show(t("{key}을 누른 채 휠을 굴리면 확대·축소돼요", { key: modKey() }), 1600),
+    // 쪽 안에서 격자를 다루는 법: PC 는 Ctrl+휠, 폰은 두 손가락(전체 화면에서는 한 손가락으로도 끈다)
+    onHint: (kind) =>
+      kind === "touch"
+        ? flash.show(t("두 손가락으로 끌거나 전체 화면에서 둘러보세요"), 2400)
+        : flash.show(t("{key}을 누른 채 휠을 굴리면 확대·축소돼요", { key: modKey() }), 1600),
   });
 
   // 화면 밖에 있으면 돌리지 않는다

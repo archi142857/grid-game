@@ -5,6 +5,7 @@
 // wheel   "zoom" 휠로 바로 키우고 줄인다 · "ctrl" Ctrl(⌘)을 누른 채일 때만(첫 화면처럼 쓸어 내려가는 쪽)
 // touch   "full" 한 손가락으로 끌어 둘러보거나 그린다 · "tap" 톡 누르기만 받는다(세로로 쓸면 쪽이 내려간다)
 // wheel·touch 는 함수로 줘도 된다(전체 화면일 때만 바꾸는 식으로)
+// onHint(kind)  격자를 다루는 법을 알려 줄 때. "wheel" Ctrl 없이 휠을 굴렸다 · "touch" "tap" 에서 한 손가락으로 옆으로 끌었다
 
 import { lineCells } from "./pen.js";
 
@@ -47,6 +48,11 @@ export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", t
   }
 
   canvas.addEventListener("pointerdown", (e) => {
+    // 격자를 누르면 다른 데 있던 포커스(키보드로 고른 단추, 표기 입력 등)를 놓는다. 마우스는 아래에서
+    // 기본 동작을 막아 브라우저가 대신 놓아 주지 않으니 여기서 한다. 그래야 스페이스·→ 가 격자로 간다
+    const fe = document.activeElement;
+    if (fe && fe !== document.body && fe.blur) fe.blur();
+
     if (e.pointerType === "mouse" && (e.button === 1 || e.button === 2)) {
       // 가운데·오른쪽 단추: 어떤 손이든 둘러본다
       e.preventDefault();
@@ -107,7 +113,11 @@ export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", t
     const far = Math.hypot(e.clientX - first.x, e.clientY - first.y) > (MOVE[e.pointerType] ?? 6);
 
     if (mode === "tap") {
-      if (far) mode = "done";
+      if (!far) return;
+      mode = "done";
+      // 한 손가락으로 옆으로 끌면 격자도 쪽도 안 움직이니 둘러보는 법을 알려 준다.
+      // 세로로 쓸면 브라우저가 쪽을 내리고(pointercancel) 그게 맞는 동작이라 알리지 않는다
+      if (onHint && Math.abs(e.clientX - first.x) > Math.abs(e.clientY - first.y)) onHint("touch");
       return;
     }
     if (mode === "maybe") {

@@ -1,6 +1,6 @@
 // 여러 화면이 같이 쓰는 머리 조각과 없는 화면.
 
-import { h, icon, ICON } from "../ui/dom.js";
+import { h, icon, ICON, setTitle } from "../ui/dom.js";
 import { t } from "../i18n.js";
 
 export function crumb(href = "#/", label = t("도감")) {
@@ -8,6 +8,7 @@ export function crumb(href = "#/", label = t("도감")) {
 }
 
 export function notFound(main) {
+  setTitle(t("없는 화면"));
   main.append(
     h(
       "div",

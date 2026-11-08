@@ -4,7 +4,7 @@
 //   #/make        새 규칙 만들기 (?rule=…)
 //   #/about       소개
 
-import { clear, h, icon } from "./ui/dom.js";
+import { clear, h, icon, setTitle } from "./ui/dom.js";
 import { t } from "./i18n.js";
 import { applyScheme, cycleScheme, scheme } from "./ui/theme.js";
 import { loadPresets } from "./data/presets.js";
@@ -34,6 +34,7 @@ function route() {
   }
   current = null;
   clear(main);
+  setTitle(null); // 제목을 따로 정하지 않는 화면이 앞 화면 제목을 물려받지 않게
   const { path, params } = parse();
   let nav = "home";
   try {
@@ -66,6 +67,15 @@ function route() {
 }
 
 window.addEventListener("hashchange", route);
+
+// 마우스·손가락으로 누른 단추는 포커스를 바로 놓는다(사파리와 같다). 그래야 스페이스·→ 가 방금 누른
+// 단추를 다시 누르지 않고 격자로 간다. 키보드로 누른 단추(e.detail 이 0)는 포커스를 그대로 둔다
+document.addEventListener("click", (e) => {
+  if (!e.detail) return;
+  // 눌린 단추가 그림을 바꿔 끼우면 e.target 이 떨어져 나가니 처음 길(composedPath)에서 찾는다
+  const btn = e.composedPath().find((n) => n instanceof Element && n.matches("button, summary"));
+  if (btn && btn === document.activeElement) btn.blur();
+});
 
 document.addEventListener("keydown", (e) => {
   if (!current || !current.onKey || e.defaultPrevented) return;
