@@ -1,0 +1,11 @@
+{
+  "id": "cyclic-14",
+  "name": "14색 순환",
+  "description": "열네 가지 색이 고리를 돌아요. 다음 색인 이웃이 하나라도 있으면 그 색으로 넘어가요. 무작위로 칠한 판이 덩어리를 거쳐 끝내 소용돌이로 정리돼요.",
+  "family": "cyclic",
+  "grid": { "edges": "infinite" },
+  "neighborhood": "von-neumann",
+  "states": [{ "name": "바탕" }, { "name": "색 1" }, { "name": "색 2" }, { "name": "색 3" }, { "name": "색 4" }, { "name": "색 5" }, { "name": "색 6" }, { "name": "색 7" }, { "name": "색 8" }, { "name": "색 9" }, { "name": "색 10" }, { "name": "색 11" }, { "name": "색 12" }, { "name": "색 13" }, { "name": "색 14" }],
+  "rule": { "threshold": 1 },
+  "seed": { "type": "random", "density": 1 }
+}

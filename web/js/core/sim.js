@@ -8,12 +8,14 @@ import { makeTable, explain as lifeExplain } from "./life.js";
 import { compileAnt, stepAnts, MAX_AGENTS, TURN_LETTERS, DIR_LETTERS } from "./ant.js";
 import { stepRow, rowsKept, isLockedNumber, patternOf, nextOf, MAX_WIDTH } from "./elementary.js";
 import { compileTable, matchRow } from "./table.js";
+import { nextColor, cyclicNeighbors } from "./cyclic.js";
 import { parseRLE } from "./rle.js";
 import { lifeRule } from "./rules.js";
 
 export { MAX_ANT_COLORS, MAX_ANT_STATES, MAX_AGENTS } from "./ant.js";
 export { ROWS_MIN, ROWS_MAX, MAX_WIDTH, rowsKept } from "./elementary.js";
 export { MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED } from "./table.js";
+export { MAX_CYCLIC_STATES, CYCLIC_THRESHOLD } from "./cyclic.js";
 
 /** 쓰는 조각(32×32)이 이만큼을 넘으면(약 100만 칸) 너무 넓게 퍼진 것으로 보고 멈춘다 */
 export const MAX_TILES = 1024;
@@ -32,7 +34,7 @@ export const around = (x, y) => [
   [x + 1, y + 1],
 ];
 
-const BUILD = { life: lifeSim, ant: antSim, elementary: elementarySim, table: tableSim };
+const BUILD = { life: lifeSim, ant: antSim, elementary: elementarySim, table: tableSim, cyclic: cyclicSim };
 
 /** 이 엔진이 sim 으로 돌릴 수 있는 계열 */
 export const SIM_FAMILIES = Object.keys(BUILD);
@@ -116,12 +118,44 @@ function tableSim(rule) {
   });
 }
 
-/** 표로 돌리는 계열(Life·조건표)이 함께 쓰는 sim */
+function cyclicSim(rule) {
+  return cellSim(rule, {
+    family: "cyclic",
+    compile: (r) => ({ colors: r.states.length - 1, threshold: r.threshold, vn: r.neighborhood === "von-neumann" }),
+    advance: (P, prog) => P.stepCyclic(prog.colors, prog.threshold, prog.vn),
+    /** 바탕은 바뀌지 않으니 늘 돌릴 수 있다 */
+    canRun: () => true,
+    /** 그래프에는 한 세대에 색이 바뀐 칸 수(움직임)를 쓴다. 바탕 아닌 칸 수는 늘 같아서 */
+    changedAsAlive: true,
+    /** 흩뿌리기·random 뿌리기는 도는 색 1…N 을 고르게 */
+    pick: (rng, states) => () => 1 + rng.int(states - 1),
+    /**
+     * 살펴보기: { now, next, why, target, n, threshold, cells }
+     *   why: turn(다음 색 이웃이 문턱 이상이라 넘어감) · wait(아직 모자람) · base(바탕은 바뀌지 않음)
+     *   target: 다음 색, n: 다음 색인 이웃 수, cells: 이웃 자리(폰 노이만 4칸, 무어 8칸)
+     */
+    explain(P, r, x, y, prog) {
+      const cells = cyclicNeighbors(x, y, r.neighborhood);
+      const now = P.get(x, y);
+      if (now === 0) return { now, next: 0, why: "base", target: null, n: 0, threshold: prog.threshold, cells };
+      const target = nextColor(now, prog.colors);
+      let n = 0;
+      for (const [a, b] of cells) if (P.get(a, b) === target) n++;
+      const turn = n >= prog.threshold;
+      return { now, next: turn ? target : now, why: turn ? "turn" : "wait", target, n, threshold: prog.threshold, cells };
+    },
+  });
+}
+
+/** 표로 돌리는 계열(Life·조건표)과 순환이 함께 쓰는 sim */
 function cellSim(rule, kind) {
   const P = makePlane();
   let r = rule;
   let prog = kind.compile(r);
   let prevOk = false; // 조각마다 바로 앞 세대가 남아 있는가
+  let lastChanged = 0; // 바로 앞 세대에 바뀐 칸 수
+  const advance = kind.advance ?? ((plane, pr) => plane.step(pr.table, pr.weights, pr.stride, pr.opts));
+  const canRun = kind.canRun ?? ((pr) => pr.table[0] === 0);
 
   const states = () => r.states.length;
   const pick = (rng) => (kind.pick ? kind.pick(rng, states()) : null);
@@ -132,7 +166,7 @@ function cellSim(rule, kind) {
       return r;
     },
     /** 이웃이 없는 빈칸이 바뀌면(Life 의 태어남 0 처럼) 빈 곳 전체가 한꺼번에 바뀌어서 끝없는 격자에서는 돌릴 수 없다 */
-    canRun: () => prog.table[0] === 0,
+    canRun: () => canRun(prog),
     get full() {
       return P.size > MAX_TILES;
     },
@@ -143,15 +177,16 @@ function cellSim(rule, kind) {
       let changed = 0;
       let k = 0;
       while (k < n) {
-        const res = P.step(prog.table, prog.weights, prog.stride);
+        const res = advance(P, prog);
         if (!res) break;
         changed += res.changed;
+        lastChanged = res.changed;
         k++;
         if (P.size > MAX_TILES) break;
       }
       if (!k) return null;
       prevOk = true;
-      return { alive: P.alive, changed, steps: k };
+      return { alive: sim.alive, changed, steps: k };
     },
 
     get: (x, y) => P.get(x, y),
@@ -171,9 +206,9 @@ function cellSim(rule, kind) {
 
     agents: NONE,
     head: null,
-    /** 상태 1 인 칸 수(Life 는 산 칸, 와이어월드는 전자 머리) */
+    /** 상태 1 인 칸 수(Life 는 산 칸, 와이어월드는 전자 머리). 순환은 바로 앞 세대에 색이 바뀐 칸 수 */
     get alive() {
-      return P.alive;
+      return kind.changedAsAlive ? lastChanged : P.alive;
     },
     /** 쓰고 있는 조각 수(넓게 퍼질수록 커진다) */
     get size() {
@@ -186,6 +221,7 @@ function cellSim(rule, kind) {
       P.restore(snap.cells);
       if (snap.states > states()) P.clampStates(states());
       prevOk = false;
+      lastChanged = 0;
     },
 
     /** 같은 계열 안에서 규칙만 바꾼다(칸은 그대로). 상태 수가 줄면 없어진 상태의 칸은 빈칸이 된다 */
@@ -201,6 +237,7 @@ function cellSim(rule, kind) {
     clear() {
       P.clear();
       prevOk = false;
+      lastChanged = 0;
     },
 
     /** 비우고 규칙 파일의 seed 대로 region 에 뿌린다 */

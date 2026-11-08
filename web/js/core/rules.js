@@ -1,16 +1,18 @@
 // 규칙 파일(JSON)을 검사하고 앱이 쓰는 꼴로 고른다. 형식은 기획서 5절과 계열 확장 설계 3절을 따른다.
 // 모든 계열이 끝없는 격자(grid.edges: infinite)에서 돈다. wrap·wall 은 파일 꼴에만 남아 있고 지금은 받지 않는다.
 // 상태 색(color)을 빼면 화면 색을 쓴다.
-// 앱 안의 규칙은 계열 내용을 맨 위로 꺼낸 꼴이다: Life 는 birth·survive, 개미는 turns 나 machine 과 agents, 1차원은 number, 조건표는 transitions.
+// 앱 안의 규칙은 계열 내용을 맨 위로 꺼낸 꼴이다: Life 는 birth·survive, 개미는 turns 나 machine 과 agents, 1차원은 number,
+// 조건표는 transitions, 순환은 threshold.
 
 import { t } from "../i18n.js";
 import { MIN_STATES, MAX_STATES, parseNotation, formatNotation } from "./life.js";
 import { MAX_ANT_COLORS, MAX_AGENTS, DIR_LETTERS, parseTurns, antRuleProblem } from "./ant.js";
 import { parseWolfram, formatWolfram, isLockedNumber } from "./elementary.js";
 import { MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED, tableProblem, compileTable, WIREWORLD, isWireworld } from "./table.js";
+import { MAX_CYCLIC_STATES, CYCLIC_THRESHOLD } from "./cyclic.js";
 
 /** 엔진이 아는 계열 */
-export const FAMILIES = ["life", "ant", "elementary", "table"];
+export const FAMILIES = ["life", "ant", "elementary", "table", "cyclic"];
 /** 화면이 붙은 계열. checkRuleFile 은 따로 말하지 않으면 이것만 받는다(화면이 되면 프론트엔드 쪽지를 받고 넣는다) */
 export const READY_FAMILIES = ["life"];
 export const SEED_TYPES = ["empty", "random", "single", "rle"];
@@ -22,6 +24,7 @@ const STATE_RANGE = {
   ant: [2, MAX_ANT_COLORS],
   elementary: [2, 2],
   table: [2, MAX_TABLE_STATES],
+  cyclic: [3, MAX_CYCLIC_STATES],
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -87,6 +90,12 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
     else if (p?.why === "zero") errors.push(t("rule.transitions[{i}]: 빈칸(0)은 셀 수 없어요", { i: p.i }));
     else if (p?.why === "many") errors.push(t("rule.transitions: 세는 상태는 {max}가지까지예요", { max: MAX_COUNTED }));
     else if (p?.why === "lock") errors.push(t("rule.transitions: 끝없는 격자에서는 이웃이 없는 빈칸이 바뀌는 줄을 쓸 수 없어요"));
+  } else if (family === "cyclic") {
+    neighborhood = obj.neighborhood ?? "moore";
+    const top = CYCLIC_THRESHOLD[neighborhood];
+    if (!top) errors.push(t("neighborhood: 순환은 moore 나 von-neumann 이에요"));
+    else if (!(Number.isInteger(rule.threshold) && rule.threshold >= 1 && rule.threshold <= top))
+      errors.push(t("rule.threshold: 1–{max} 사이 정수여야 해요", { max: top }));
   }
 
   const grid = obj.grid ?? {};
@@ -124,6 +133,7 @@ export function checkRuleFile(obj, { families = READY_FAMILIES } = {}) {
     out.agents = (obj.agents ?? [{ x: 0, y: 0, dir: "N" }]).map((a) => ({ x: a.x, y: a.y, dir: a.dir }));
   } else if (family === "elementary") out.number = rule.number;
   else if (family === "table") out.transitions = clone(rule.transitions);
+  else if (family === "cyclic") out.threshold = rule.threshold;
   out.seed = { ...seed };
   return { rule: out };
 }
@@ -134,6 +144,7 @@ function ruleBody(r) {
   if (r.family === "ant") return r.turns !== undefined ? { turns: r.turns } : { machine: r.machine };
   if (r.family === "elementary") return { number: r.number };
   if (r.family === "table") return { transitions: r.transitions };
+  if (r.family === "cyclic") return { threshold: r.threshold };
   return {};
 }
 
@@ -153,7 +164,8 @@ export function toRuleFile(r) {
 
 /** 상태 i 의 기본 이름 */
 export function defaultStateName(i, family = "life") {
-  if (i === 0) return t("빈칸");
+  if (i === 0) return family === "cyclic" ? t("바탕") : t("빈칸");
+  if (family === "cyclic") return t("색 {k}", { k: i });
   if (family === "ant") return t("색 {k}", { k: i });
   if (family === "elementary") return t("켜진 칸");
   if (family === "table") return t("상태 {k}", { k: i });
@@ -173,7 +185,10 @@ export const lifeRule = (r) => ({ birth: r.birth, survive: r.survive, states: r.
 
 /** 움직임이 같은 규칙인가(이름·색·시작 상태·개미 자리는 보지 않는다) */
 export const sameRule = (a, b) =>
-  (a.family ?? "life") === (b.family ?? "life") && a.states.length === b.states.length && JSON.stringify(ruleBody(a)) === JSON.stringify(ruleBody(b));
+  (a.family ?? "life") === (b.family ?? "life") &&
+  (a.neighborhood ?? "moore") === (b.neighborhood ?? "moore") &&
+  a.states.length === b.states.length &&
+  JSON.stringify(ruleBody(a)) === JSON.stringify(ruleBody(b));
 
 /**
  * 주소(?rule=)의 표기를 읽는다. 못 읽으면 null. 돌릴 수 없는 규칙(B0, 홀수 번호)도 읽기는 한다(lockOf 로 따로 본다)

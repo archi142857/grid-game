@@ -17,6 +17,10 @@ export const REACH = LIMIT * TILE;
 
 const keyOf = (tx, ty) => tx * 65536 + ty;
 const isLive = (v) => (v === 1 ? 1 : 0);
+const raw = (v) => v;
+/** 칸 값을 그대로 판에 옮기는 무게(순환이 쓴다) */
+const RAW = Uint8Array.from({ length: 256 }, (_, i) => i);
+const NO_OPTS = Object.freeze({});
 
 // 가장자리 표시: 그 줄에 산 칸이 있으면 그쪽 이웃 조각이 있어야 한다
 const EDGE_N = 1;
@@ -91,6 +95,7 @@ function makeTile(tx, ty) {
 export function makePlane() {
   const tiles = new Map();
   const pad = new Uint8Array(P * P);
+  const pad32 = new Uint32Array(P * P); // 무게가 큰 코드 규칙이 쓴다
   let alive = 0;
   let filled = 0; // 빈칸이 아닌 칸 수
 
@@ -149,20 +154,20 @@ export function makePlane() {
     }
   }
 
-  /** 조각과 둘레 한 줄의 무게(기본은 '산 칸인가')를 34×34 판에 옮긴다. val 은 둘레 칸의 무게 */
-  function fillPad(t, w, val) {
+  /** 조각과 둘레 한 줄을 34×34 판 b 에 옮긴다. w 는 조각 칸의 무게(없으면 '산 칸인가'), val 은 둘레 칸의 무게 */
+  function fillPad(t, w, val, b = pad) {
     const c = t.cells;
     for (let y = 0; y < S; y++) {
       const o = (y + 1) * P + 1;
       const r = y * S;
-      if (w) for (let x = 0; x < S; x++) pad[o + x] = w[c[r + x]];
-      else for (let x = 0; x < S; x++) pad[o + x] = c[r + x] === 1 ? 1 : 0;
+      if (w) for (let x = 0; x < S; x++) b[o + x] = w[c[r + x]];
+      else for (let x = 0; x < S; x++) b[o + x] = c[r + x] === 1 ? 1 : 0;
     }
-    fillRim(t, val);
+    fillRim(t, val, b);
   }
 
   /** 둘레 한 줄을 이웃 조각에서 빌려 온다 */
-  function fillRim(t, val) {
+  function fillRim(t, val, b) {
     const { tx, ty } = t;
     const n = tiles.get(keyOf(tx, ty - 1));
     const s = tiles.get(keyOf(tx, ty + 1));
@@ -174,59 +179,140 @@ export function makePlane() {
     const se = tiles.get(keyOf(tx + 1, ty + 1));
     const bottom = (S + 1) * P;
     for (let x = 0; x < S; x++) {
-      pad[x + 1] = n ? val(n.cells[N - S + x]) : 0;
-      pad[bottom + x + 1] = s ? val(s.cells[x]) : 0;
+      b[x + 1] = n ? val(n.cells[N - S + x]) : 0;
+      b[bottom + x + 1] = s ? val(s.cells[x]) : 0;
     }
     for (let y = 0; y < S; y++) {
       const o = (y + 1) * P;
-      pad[o] = w ? val(w.cells[y * S + MASK]) : 0;
-      pad[o + S + 1] = e ? val(e.cells[y * S]) : 0;
+      b[o] = w ? val(w.cells[y * S + MASK]) : 0;
+      b[o + S + 1] = e ? val(e.cells[y * S]) : 0;
     }
-    pad[0] = nw ? val(nw.cells[N - 1]) : 0;
-    pad[S + 1] = ne ? val(ne.cells[N - S]) : 0;
-    pad[bottom] = sw ? val(sw.cells[MASK]) : 0;
-    pad[bottom + S + 1] = se ? val(se.cells[0]) : 0;
+    b[0] = nw ? val(nw.cells[N - 1]) : 0;
+    b[S + 1] = ne ? val(ne.cells[N - S]) : 0;
+    b[bottom] = sw ? val(sw.cells[MASK]) : 0;
+    b[bottom + S + 1] = se ? val(se.cells[0]) : 0;
   }
 
-  /**
-   * 한 세대를 넘긴다. table 은 core/life.js 의 makeTable 이 만든 표(지금 상태 * stride + 이웃 수).
-   * weights 를 주면 이웃 수 대신 이웃 무게의 합으로 찾는다(core/table.js). 산 칸(1)만 세면 null.
-   * 빈칸이 이웃 없이도 바뀌면(태어남 0 처럼) 끝없는 격자에서는 돌릴 수 없어 null 을 돌려준다.
-   */
-  function step(table, weights = null, stride = 9) {
-    if (table[0] !== 0) return null;
-    const w = weights;
-    const val = w ? (v) => w[v] : isLive;
-    expand(w);
-    let changed = 0;
-    for (const t of tiles.values()) {
-      fillPad(t, w, val);
-      const src = t.cells;
-      const dst = t.next;
-      let pop = 0;
-      let live = 0;
-      let ch = 0;
-      for (let y = 0, i = 0; y < S; y++) {
-        const r0 = y * P;
-        const r1 = r0 + P;
-        const r2 = r1 + P;
-        for (let x = 0; x < S; x++, i++) {
-          const n =
-            pad[r0 + x] + pad[r0 + x + 1] + pad[r0 + x + 2] + pad[r1 + x] + pad[r1 + x + 2] + pad[r2 + x] + pad[r2 + x + 1] + pad[r2 + x + 2];
-          const now = src[i];
-          const nx = table[now * stride + n];
-          dst[i] = nx;
-          if (nx !== 0) {
-            pop++;
-            if (nx === 1) live++;
-          }
-          if (nx !== now) ch++;
+  // ── 조각 하나를 넘기는 계산(판 pad 를 채운 뒤 부른다). t.next 에 쓰고, 바뀐 칸 수를 돌려준다 ─────────────────
+
+  /** 무어 8칸 무게의 합으로 표를 찾는다(Life·조건표) */
+  function kMoore(t, table, stride) {
+    const src = t.cells;
+    const dst = t.next;
+    let pop = 0;
+    let live = 0;
+    let ch = 0;
+    for (let y = 0, i = 0; y < S; y++) {
+      const r0 = y * P;
+      const r1 = r0 + P;
+      const r2 = r1 + P;
+      for (let x = 0; x < S; x++, i++) {
+        const n = pad[r0 + x] + pad[r0 + x + 1] + pad[r0 + x + 2] + pad[r1 + x] + pad[r1 + x + 2] + pad[r2 + x] + pad[r2 + x + 1] + pad[r2 + x + 2];
+        const now = src[i];
+        const nx = table[now * stride + n];
+        dst[i] = nx;
+        if (nx !== 0) {
+          pop++;
+          if (nx === 1) live++;
         }
+        if (nx !== now) ch++;
       }
-      t.nPop = pop;
-      t.nLive = live;
-      changed += ch;
     }
+    t.nPop = pop;
+    t.nLive = live;
+    return ch;
+  }
+
+  /** 육각 6칸(Golly 꼴: 오른쪽 위·왼쪽 아래를 뺀 무어 이웃) 무게의 합으로 표를 찾는다 */
+  function kHex(t, table, stride) {
+    const src = t.cells;
+    const dst = t.next;
+    let pop = 0;
+    let live = 0;
+    let ch = 0;
+    for (let y = 0, i = 0; y < S; y++) {
+      const r0 = y * P;
+      const r1 = r0 + P;
+      const r2 = r1 + P;
+      for (let x = 0; x < S; x++, i++) {
+        const n = pad[r0 + x] + pad[r0 + x + 1] + pad[r1 + x] + pad[r1 + x + 2] + pad[r2 + x + 1] + pad[r2 + x + 2];
+        const now = src[i];
+        const nx = table[now * stride + n];
+        dst[i] = nx;
+        if (nx !== 0) {
+          pop++;
+          if (nx === 1) live++;
+        }
+        if (nx !== now) ch++;
+      }
+    }
+    t.nPop = pop;
+    t.nLive = live;
+    return ch;
+  }
+
+  /** 무어 8칸 무게(큰 수)의 합을 compact 로 줄여 표를 찾는다(코드 규칙: 상태마다 이웃 수) */
+  function kCompact(t, table, stride, compact) {
+    const src = t.cells;
+    const dst = t.next;
+    const b = pad32;
+    let pop = 0;
+    let live = 0;
+    let ch = 0;
+    for (let y = 0, i = 0; y < S; y++) {
+      const r0 = y * P;
+      const r1 = r0 + P;
+      const r2 = r1 + P;
+      for (let x = 0; x < S; x++, i++) {
+        const n = b[r0 + x] + b[r0 + x + 1] + b[r0 + x + 2] + b[r1 + x] + b[r1 + x + 2] + b[r2 + x] + b[r2 + x + 1] + b[r2 + x + 2];
+        const now = src[i];
+        const nx = table[now * stride + compact[n]];
+        dst[i] = nx;
+        if (nx !== 0) {
+          pop++;
+          if (nx === 1) live++;
+        }
+        if (nx !== now) ch++;
+      }
+    }
+    t.nPop = pop;
+    t.nLive = live;
+    return ch;
+  }
+
+  /** 순환: 바탕(0)은 그대로, 색 k(1–colors)는 다음 색인 이웃이 문턱 이상이면 다음 색. 판에는 칸 값이 그대로 있다 */
+  function kCyclic(t, colors, threshold, vn) {
+    const src = t.cells;
+    const dst = t.next;
+    let pop = 0;
+    let live = 0;
+    let ch = 0;
+    for (let y = 0, i = 0; y < S; y++) {
+      const r0 = y * P;
+      const r1 = r0 + P;
+      const r2 = r1 + P;
+      for (let x = 0; x < S; x++, i++) {
+        const v = src[i];
+        let nx = v;
+        if (v !== 0) {
+          const s = v >= colors ? 1 : v + 1;
+          let n = (pad[r0 + x + 1] === s) + (pad[r1 + x] === s) + (pad[r1 + x + 2] === s) + (pad[r2 + x + 1] === s);
+          if (!vn) n += (pad[r0 + x] === s) + (pad[r0 + x + 2] === s) + (pad[r2 + x] === s) + (pad[r2 + x + 2] === s);
+          if (n >= threshold) nx = s;
+          pop++;
+          if (nx === 1) live++;
+        }
+        dst[i] = nx;
+        if (nx !== v) ch++;
+      }
+    }
+    t.nPop = pop;
+    t.nLive = live;
+    return ch;
+  }
+
+  /** 조각마다 계산한 다음 세대로 바꾸고 세는 수를 맞춘다. 빈 조각은 한 세대 뒤에 지운다 */
+  function commit(w, changed) {
     let total = 0;
     let all = 0;
     for (const [k, t] of tiles) {
@@ -245,6 +331,42 @@ export function makePlane() {
     alive = total;
     filled = all;
     return { alive, changed };
+  }
+
+  /**
+   * 한 세대를 넘긴다. table 은 core/life.js 의 makeTable 이 만든 표(지금 상태 * stride + 이웃 수).
+   * weights 를 주면 이웃 수 대신 이웃 무게의 합으로 찾는다(core/table.js). 산 칸(1)만 세면 null.
+   * opts.hex: 육각 6이웃 · opts.compact: 무게 합을 표의 칸 번호로 바꾸는 배열(무게가 큰 코드 규칙, weights 는 Uint32Array)
+   * 빈칸이 이웃 없이도 바뀌면(태어남 0 처럼) 끝없는 격자에서는 돌릴 수 없어 null 을 돌려준다.
+   */
+  function step(table, weights = null, stride = 9, opts = NO_OPTS) {
+    if (table[0] !== 0) return null;
+    const w = weights;
+    const val = w ? (v) => w[v] : isLive;
+    const compact = opts.compact ?? null;
+    const hex = !!opts.hex;
+    expand(w);
+    let changed = 0;
+    for (const t of tiles.values()) {
+      if (compact) {
+        fillPad(t, w, val, pad32);
+        changed += kCompact(t, table, stride, compact);
+      } else {
+        fillPad(t, w, val);
+        changed += hex ? kHex(t, table, stride) : kMoore(t, table, stride);
+      }
+    }
+    return commit(w, changed);
+  }
+
+  /** 순환 계열의 한 세대. colors 는 도는 색 수(1–colors), vn 이면 폰 노이만 4칸, 아니면 무어 8칸. 바탕은 바뀌지 않아 조각을 늘리지 않는다 */
+  function stepCyclic(colors, threshold, vn) {
+    let changed = 0;
+    for (const t of tiles.values()) {
+      fillPad(t, RAW, raw);
+      changed += kCyclic(t, colors, threshold, vn);
+    }
+    return commit(null, changed);
   }
 
   /** (x0, y0)–(x1, y1)(양 끝 포함)에 걸친 조각마다 fn(조각 왼쪽 위 x, y, 한 변, 지금 칸, 앞 세대 칸) */
@@ -405,6 +527,7 @@ export function makePlane() {
     get,
     set,
     step,
+    stepCyclic,
     blocks,
     bounds,
     clear,
