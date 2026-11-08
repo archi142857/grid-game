@@ -527,7 +527,7 @@ function makeShelf(presets) {
       "div",
       { class: "section-head" },
       h("h2", { id: "shelf-t" }, t("도감")),
-      h("p", {}, t("이름난 규칙 {n}가지를 모았어요. 그림에 커서를 올리면 움직이고, 누르면 크게 돌려 볼 수 있어요.", { n: presets.length })),
+      h("p", {}, t("이름난 규칙 {n}가지를 모았어요. 그림을 누르면 크게 돌려 볼 수 있어요.", { n: presets.length })),
     ),
     h("ul", { class: "specimens" }, items),
     h("p", { class: "soon" }, t("다음에 들어올 규칙: {list}", { list: SOON().join(", ") })),
