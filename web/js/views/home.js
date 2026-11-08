@@ -490,9 +490,17 @@ function makeLesson() {
 
 // ── 도감: 규칙마다 작은 격자 ─────────────────
 
+/** 도감 묶음(사용자가 고른 시안 B): 계열마다 이름, 규칙 수, 한 줄 설명 */
+const GROUPS = [
+  { id: "life", name: () => t("생명 게임 계열"), note: () => t("이웃 수로 살고 죽어요") },
+  { id: "ant", name: () => t("개미"), note: () => t("칸 위를 걷는 개미가 색을 바꿔요") },
+  { id: "elementary", name: () => t("1차원"), note: () => t("한 줄이 세대마다 아래로 쌓여요") },
+  { id: "table", name: () => t("조건표"), note: () => t("상태마다 바뀔 조건을 적어요") },
+];
+
 function makeShelf(presets) {
   const thumbs = [];
-  const items = presets.map((p) => {
+  const item = (p) => {
     const th = makeThumb(p, { gens: THUMB_GENS[p.id] });
     thumbs.push(th);
     const credit = creditOf(p.id);
@@ -515,23 +523,39 @@ function makeShelf(presets) {
         th,
       ),
     );
-  });
-  items.push(
-    h(
-      "li",
-      {},
+  };
+  const group = (head, list) => h("div", { class: "shelf-group" }, head, h("ul", { class: "specimens" }, list));
+  const known = new Set(GROUPS.map((g) => g.id));
+  const groups = GROUPS.map((g) => [g, presets.filter((p) => p.family === g.id)])
+    .filter(([, list]) => list.length)
+    .map(([g, list]) =>
+      group(
+        h("div", { class: "shelf-head" }, h("h3", {}, g.name()), h("span", { class: "shelf-count", "aria-label": t("규칙 {n}가지", { n: list.length }) }, String(list.length)), h("p", {}, g.note())),
+        list.map(item),
+      ),
+    );
+  // 묶음을 아직 정하지 않은 계열은 머리 없이 뒤에
+  const rest = presets.filter((p) => !known.has(p.family));
+  if (rest.length) groups.push(group(null, rest.map(item)));
+  // 새 규칙 만들기는 맨 끝에 머리 없는 묶음으로
+  groups.push(
+    group(null, [
       h(
-        "a",
-        { class: "spec new", href: "#/make" },
-        h("span", { class: "spec-art" }, newRuleArt()),
+        "li",
+        {},
         h(
-          "span",
-          { class: "spec-text" },
-          h("span", { class: "spec-name" }, t("새 규칙 만들기")),
-          h("span", { class: "spec-meta" }, t("점을 눌러 숫자를 골라요")),
+          "a",
+          { class: "spec new", href: "#/make" },
+          h("span", { class: "spec-art" }, newRuleArt()),
+          h(
+            "span",
+            { class: "spec-text" },
+            h("span", { class: "spec-name" }, t("새 규칙 만들기")),
+            h("span", { class: "spec-meta" }, t("점을 눌러 숫자를 골라요")),
+          ),
         ),
       ),
-    ),
+    ]),
   );
   const el = h(
     "section",
@@ -542,7 +566,7 @@ function makeShelf(presets) {
       h("h2", { id: "shelf-t" }, t("도감")),
       h("p", {}, t("이름난 규칙 {n}가지를 모았어요. 그림을 누르면 크게 돌려 볼 수 있어요.", { n: presets.length })),
     ),
-    h("ul", { class: "specimens" }, items),
+    groups,
     h("p", { class: "soon" }, t("다음에 들어올 규칙: {list}", { list: SOON().join(", ") })),
   );
   return {

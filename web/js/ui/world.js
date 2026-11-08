@@ -9,6 +9,9 @@ import { makeRng, randomSeed } from "../core/rng.js";
 
 export { MAX_TILES };
 
+/** 개미 자취로 남길 걸음 수(그림에만 쓴다) */
+const TRAIL = 6;
+
 /** 가운데가 (cx, cy) 인 w×h 네모 */
 export const regionAt = (cx, cy, w, h) => ({ x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) });
 
@@ -23,6 +26,7 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
     marks: [0], // 기록마다 몇 세대(걸음)의 값인지. 한 번에 여러 걸음을 넘기면 띄엄띄엄 늘어난다
     start: 0, // alive[0] 이 몇 세대의 값인지
     region: regionAt(0, 0, 64, 48), // 마지막으로 뿌린 자리
+    trails: [], // 개미마다 바로 앞 걸음 자리 [[x, y] …](오래된 것부터 TRAIL 개까지)
 
     get sim() {
       return S;
@@ -95,6 +99,7 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
 
     /** 0세대부터 다시 센다 */
     restart() {
+      W.trails = [];
       W.gen = 0;
       W.alive = [S.alive];
       W.changed = [0];
@@ -104,6 +109,7 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
 
     /** 손으로 칸을 바꾼 뒤. 0세대면 처음 모습도 바뀐 것으로 본다 */
     touched() {
+      W.trails = [];
       if (W.gen === 0) {
         W.origin = null;
         W.alive = [S.alive];
@@ -114,7 +120,7 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
     step(n = 1) {
       if (!S.canRun() || S.full) return false;
       if (W.gen === 0) W.origin = S.snapshot();
-      const res = S.step(n);
+      const res = S.family === "ant" ? stepAnts(n) : S.step(n);
       if (!res) return false;
       W.gen += res.steps;
       W.alive.push(res.alive);
@@ -165,6 +171,37 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
       return W.changed[W.changed.length - 1];
     },
   };
+
+  /** 개미: 마지막 TRAIL 걸음은 한 걸음씩 가며 떠나는 자리를 자취로 쌓는다. 앞은 한 번에 몰아 넘긴다 */
+  function stepAnts(n) {
+    const tail = Math.min(n, TRAIL);
+    let alive = 0;
+    let changed = 0;
+    let steps = 0;
+    if (n > tail) {
+      const r = S.step(n - tail);
+      if (!r) return null;
+      alive = r.alive;
+      changed += r.changed;
+      steps += r.steps;
+      W.trails = []; // 몰아 넘긴 사이의 자리는 모른다
+      if (r.steps < n - tail) return { alive, changed, steps };
+    }
+    for (let i = 0; i < tail; i++) {
+      const from = S.agents.map((a) => [a.x, a.y]);
+      const r = S.step(1);
+      if (!r || !r.steps) break;
+      from.forEach((p, j) => {
+        const tr = W.trails[j] ?? (W.trails[j] = []);
+        tr.push(p);
+        if (tr.length > TRAIL) tr.shift();
+      });
+      alive = r.alive;
+      changed += r.changed;
+      steps += r.steps;
+    }
+    return steps ? { alive, changed, steps } : null;
+  }
 
   W.restart();
   return W;

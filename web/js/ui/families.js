@@ -13,7 +13,6 @@ import { boardColors } from "./theme.js";
 import { LIFE_WORDS } from "./spark.js";
 
 const copy = (o) => structuredClone(o);
-const css = ([r, g, b]) => `rgb(${r} ${g} ${b})`;
 
 const SPEED_NAME = { slow: () => t("느리게"), normal: () => t("보통"), fast: () => t("빠르게") };
 /** [[id, 1초에 몇 번]] → 빠르기 고르기 단추 */
@@ -138,68 +137,58 @@ export function describeAnt(r) {
   return list + t("개미는 밟은 칸의 색에 맞춰 돌고, 그 칸을 다음 색으로 칠한 뒤 한 칸 나아가요.");
 }
 
-/** 색마다 회전 글자 단추(누르면 L → R → N → U), 색 수 고르기. 터마이트는 표로 보여 주기만 한다 */
+/**
+ * 회전 글자 편집기(사용자가 고른 시안 A): 칸 색마다 한 줄. 줄머리에 그 색의 점(.swatch)과 이름, 오른쪽에 L·R·N·U 넷 가운데 하나.
+ * 색 빼기·더하기. 터마이트(machine)는 표로 보여 주기만 한다(규칙 파일로 고친다)
+ */
 function makeAntPad({ get, set }) {
-  const el = h("div", { class: "pad ant-pad" });
-  let shape = ""; // 다시 만들어야 하는지 볼 열쇠
-  let buttons = [];
-  let out = null;
+  const turns = h("div", { class: "turns", role: "group", "aria-label": t("회전 글자") });
+  const less = h("button", { class: "btn small", type: "button", onclick: () => get().turns.length > 2 && setTurns(get().turns.slice(0, -1)) }, t("색 빼기"));
+  const more = h("button", { class: "btn small", type: "button", onclick: () => get().turns.length < MAX_ANT_COLORS && setTurns(`${get().turns}L`) }, t("색 더하기"));
+  const tools = h("div", { class: "file-row" }, less, more);
+  const machine = h("div", { class: "machine-wrap" });
+  const el = h("div", { class: "ant-pad" }, turns, tools, machine);
+  let rows = []; // 색마다 { row, swatch, name, btns: { L, R, N, U } }
+  let shape = "";
 
-  function setTurns(turns) {
+  function setTurns(next) {
     const r = copy(get());
-    r.turns = turns;
+    r.turns = next;
     delete r.machine;
-    r.states = resizeStates(r.states, turns.length, "ant");
+    r.states = resizeStates(r.states, next.length, "ant");
     set(r);
   }
 
-  function buildTurns(r) {
-    const n = r.turns.length;
-    buttons = [...r.turns].map((_, i) =>
-      h("button", {
-        type: "button",
-        class: "count turn",
-        onclick: () => {
-          const cur = get().turns;
-          const next = TURN_ORDER[(TURN_ORDER.indexOf(cur[i]) + 1) % TURN_ORDER.length];
-          setTurns(cur.slice(0, i) + next + cur.slice(i + 1));
-        },
-      }),
-    );
-    // 한 줄에 여덟 개까지(색이 많으면 여러 줄)
-    const rows = [];
-    for (let i = 0; i < n; i += 8) rows.push(h("div", { class: "counts turns" }, buttons.slice(i, i + 8)));
-    out = h("output", {}, String(n));
-    el.replaceChildren(
-      h("div", { class: "pad-row", role: "group", "aria-label": t("도는 쪽") }, h("span", { class: "pad-label", "aria-hidden": "true" }, t("도는 쪽")), h("div", { class: "pad" }, rows)),
-      h(
-        "div",
-        { class: "pad-row" },
-        h("span", { class: "pad-label" }, t("색 수")),
-        h(
-          "div",
-          { class: "stepper", role: "group", "aria-label": t("색 수") },
-          h(
-            "button",
-            { class: "btn small square", type: "button", "aria-label": t("색 하나 빼기"), onclick: () => get().turns.length > 2 && setTurns(get().turns.slice(0, -1)) },
-            icon(ICON.minus),
-          ),
-          out,
-          h(
-            "button",
-            { class: "btn small square", type: "button", "aria-label": t("색 하나 더하기"), onclick: () => get().turns.length < MAX_ANT_COLORS && setTurns(`${get().turns}L`) },
-            icon(ICON.plus),
-          ),
-        ),
-      ),
-    );
+  function buildRows(n) {
+    rows = Array.from({ length: n }, (_, i) => {
+      const swatch = h("span", { class: "swatch" });
+      const name = h("span");
+      const btns = {};
+      for (const c of TURN_ORDER) {
+        btns[c] = h(
+          "button",
+          {
+            type: "button",
+            class: "count",
+            "aria-pressed": "false",
+            title: TURN_WORD[c](),
+            onclick: () => {
+              const cur = get().turns;
+              if (cur[i] !== c) setTurns(cur.slice(0, i) + c + cur.slice(i + 1));
+            },
+          },
+          c,
+        );
+      }
+      const row = h("div", { class: "pad-row", role: "group" }, h("span", { class: "pad-label" }, swatch, name), h("div", { class: "counts" }, TURN_ORDER.split("").map((c) => btns[c])));
+      return { row, swatch, name, btns };
+    });
+    turns.replaceChildren(...rows.map((x) => x.row));
   }
 
   function buildMachine(r) {
-    buttons = [];
-    out = null;
     const name = (i) => r.states[i]?.name ?? String(i);
-    el.replaceChildren(
+    machine.replaceChildren(
       h(
         "table",
         { class: "machine" },
@@ -227,25 +216,38 @@ function makeAntPad({ get, set }) {
       const key = r.machine ? `m${JSON.stringify(r.machine)}` : `t${r.turns.length}`;
       if (key !== shape) {
         shape = key;
-        if (r.machine) buildMachine(r);
-        else buildTurns(r);
+        turns.hidden = tools.hidden = !!r.machine;
+        machine.hidden = !r.machine;
+        if (r.machine) {
+          rows = [];
+          turns.replaceChildren();
+          buildMachine(r);
+        } else {
+          machine.replaceChildren();
+          buildRows(r.turns.length);
+        }
       }
       if (!r.turns) return;
-      const cols = boardColors(r.states, "ant");
-      buttons.forEach((b, i) => {
-        const c = r.turns[i];
-        const name = r.states[i]?.name ?? String(i);
-        b.textContent = c;
-        b.setAttribute("aria-label", t("{name}에서 도는 쪽: {dir}. 눌러서 바꾸기", { name, dir: TURN_WORD[c]() }));
-        b.title = t("{name}에서 도는 쪽: {dir}", { name, dir: TURN_WORD[c]() });
-        // 칸 색을 테로 보여 준다(모양은 임시)
-        b.style.boxShadow = `inset 0 0 0 3px ${css(i === 0 ? cols.empty : cols.shape[i].color)}`;
+      const dots = boardColors(r.states, "ant").shape;
+      rows.forEach((x, i) => {
+        const label = r.states[i]?.name ?? String(i);
+        x.name.textContent = label;
+        x.row.setAttribute("aria-label", t("{name}에서 도는 쪽", { name: label }));
+        // 그 색의 점: 빈칸은 빈칸 점, 다른 색은 판과 같은 크기(진하기는 CSS 가 크기에 맞춘다)
+        x.swatch.classList.toggle("empty", i === 0);
+        if (i > 0) x.swatch.style.setProperty("--r", String(+dots[i].r.toFixed(3)));
+        else x.swatch.style.removeProperty("--r");
+        for (const c of TURN_ORDER) x.btns[c].setAttribute("aria-pressed", String(r.turns[i] === c));
       });
-      if (out) out.textContent = String(r.turns.length);
+      less.disabled = r.turns.length <= 2;
+      more.disabled = r.turns.length >= MAX_ANT_COLORS;
     },
-    /** 살펴보는 칸의 색에 맞는 글자에 테 */
+    /** 살펴보는 칸의 색 줄에서 지금 고른 글자에 테 */
     mark(ex) {
-      buttons.forEach((b, i) => b.classList.toggle("why", !!ex && i === ex.now));
+      const cur = get().turns;
+      rows.forEach((x, i) => {
+        for (const c of TURN_ORDER) x.btns[c].classList.toggle("why", !!ex && cur !== undefined && i === ex.now && cur[i] === c);
+      });
     },
   };
 }

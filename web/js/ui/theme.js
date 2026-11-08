@@ -44,6 +44,16 @@ export function hexToRgb(hex) {
 
 export const mixRgb = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
 
+/** 새 계열 점의 수치(style.css 맨 위 변수). 반지름은 칸 한 변에 대한 비율 */
+function dotVars() {
+  const n = (name, d) => {
+    const v = parseFloat(cssVar(name));
+    return Number.isFinite(v) ? v : d;
+  };
+  return { rMin: n("--dot-r-min", 0.14), toneMin: n("--dot-tone-min", 0.6), tail: n("--tail-r", 0.25), wire: n("--wire-r", 0.16), keep: n("--row-keep", 4), fade: n("--row-fade", 17) };
+}
+const R = 0.4; // 가장 큰 점(산 칸)
+
 /**
  * 판을 그릴 색과 모양. 바탕(bg), 빈칸 점(empty), 커서·이웃 고리(ring), 신호색(signal),
  * 개미 표시(agent), 1차원의 새 줄(head), 그리고 상태마다 점 모양 shape[s] (s ≥ 1):
@@ -51,8 +61,10 @@ export const mixRgb = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k
  *   color  그 상태에 머무는 칸의 색 [r, g, b] 또는 [r, g, b, a]
  *   enter  다른 상태에서 막 들어온 칸의 색(없으면 color). Life 의 방금 태어난 칸이 신호색
  *   exit   이 상태에서 빈칸으로 줄어들며 사라지는 칸의 색(없으면 color)
+ * 1차원은 지난 줄이 나이(a = 지금 줄 − 그 줄)에 따라 작아진다: age(a) → { r, color }, ageMax 넘으면 ageMax 와 같다.
  * Life 는 산 칸이 잉크, 사라지는 칸(상태 2 이상)은 잉크에서 빈칸 점 색으로 흐려지며 작아진다.
- * 다른 계열의 모양은 디자인이 정하기 전까지 임시다(상태마다 잉크를 단계로 옅게).
+ * 다른 계열은 사용자가 고른 시안 B(크기): 점이 작을수록 옅다(빈칸 점 색에서 잉크·신호색 쪽으로, 반지름에 맞춘 진하기만큼).
+ *   개미: 1번 색이 가장 작고 마지막 색이 산 칸 크기. 조건표: 1 신호색 큰 점, 2 신호색 꼬리, 3 이상 잉크(마지막이 도선 크기)
  * 규칙 파일에 상태 색(color)이 있으면 그 색이 먼저다.
  */
 export function boardColors(states, family = "life") {
@@ -63,16 +75,42 @@ export function boardColors(states, family = "life") {
   const signal = hexToRgb(cssVar("--signal"));
   const own = (i, c) => (states[i]?.color ? hexToRgb(states[i].color) : c);
   const shape = [null];
+  const out = { bg, empty, ink, signal, agent: signal, head: signal, shape, ring: hexToRgb(cssVar("--ink-4")) };
   if (family === "life") {
     const live = own(1, ink);
-    shape[1] = { r: 0.4, color: live, enter: signal, exit: [...live, 0.45] };
+    shape[1] = { r: R, color: live, enter: signal, exit: [...live, 0.45] };
     for (let k = 2; k < C; k++) {
       const f = (k - 2) / Math.max(1, C - 2);
-      shape[k] = { r: 0.4 * (0.74 - 0.44 * f), color: own(k, mixRgb(ink, empty, 0.38 + 0.42 * f)) };
+      shape[k] = { r: R * (0.74 - 0.44 * f), color: own(k, mixRgb(ink, empty, 0.38 + 0.42 * f)) };
     }
-  } else {
-    // 임시: 상태 1 이 잉크, 번호가 클수록 옅게. 크기는 같다
-    for (let k = 1; k < C; k++) shape[k] = { r: 0.4, color: own(k, mixRgb(ink, empty, (0.55 * (k - 1)) / Math.max(1, C - 2))) };
+    out.ink = live;
+    return out;
   }
-  return { bg, empty, ink: shape[1]?.color ?? ink, signal, agent: signal, head: signal, shape, ring: hexToRgb(cssVar("--ink-4")) };
+  const K = dotVars();
+  const tone = (r) => Math.max(K.toneMin, Math.min(1, K.toneMin + ((1 - K.toneMin) * (r - K.rMin)) / (R - K.rMin)));
+  const shade = (base, r) => mixRgb(empty, base, tone(r));
+  const dot = (k, r, base) => ({ r, color: own(k, shade(base, r)) });
+  if (family === "ant") {
+    for (let k = 1; k < C; k++) shape[k] = dot(k, K.rMin + (R - K.rMin) * (C <= 2 ? 1 : (k - 1) / (C - 2)), ink);
+  } else if (family === "table") {
+    const last = C - 1;
+    for (let k = 1; k < C; k++) {
+      if (k === 1) shape[k] = dot(k, R, signal);
+      else if (k === 2) shape[k] = dot(k, K.tail, signal);
+      else shape[k] = dot(k, last === 3 ? K.wire : R - ((R - K.wire) * (k - 3)) / (last - 3), ink);
+    }
+  } else if (family === "elementary") {
+    shape[1] = { r: R, color: own(1, ink) };
+    // 지난 줄: --row-keep 줄까지는 그대로, 그 뒤 --row-fade 줄 동안 가장 작은 점까지
+    const radius = (a) => (a <= K.keep ? R : R - (R - K.rMin) * Math.min(1, (a - K.keep) / K.fade));
+    out.ageMax = Math.ceil(K.keep + K.fade);
+    out.age = (a) => {
+      const r = radius(Math.min(a, out.ageMax));
+      return { r, color: own(1, shade(ink, r)) };
+    };
+  } else {
+    // 아직 모양을 정하지 않은 계열: 1번이 잉크, 번호가 클수록 작고 옅게
+    for (let k = 1; k < C; k++) shape[k] = dot(k, R - (R - K.rMin) * ((k - 1) / Math.max(1, C - 2)), ink);
+  }
+  return out;
 }

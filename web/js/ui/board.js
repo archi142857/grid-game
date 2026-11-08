@@ -7,7 +7,8 @@
 //   fn(왼쪽 위 x, y, 너비, 높이, 지금 칸, 앞 세대 칸 | null) 을 보이는 범위에 걸친 덩어리마다 부른다.
 // 있으면 더 그린다(core/sim.js 와 같은 이름)
 //   src.agents  [{ x, y, dir }] 개미. dir 0 위 · 1 오른쪽 · 2 아래 · 3 왼쪽
-//   src.head    1차원의 지금 줄 y. 그 줄은 앞 줄이 없어도 막 바뀐 칸으로 그린다
+//   src.trails  개미마다 바로 앞 걸음 자리 [[x, y] …](오래된 것부터). 자취로 그린다
+//   src.head    1차원의 지금 줄 y. 그 줄은 앞 줄이 없어도 막 바뀐 칸으로 그리고, 지난 줄은 나이에 따라 작게(colors.age)
 // 상태마다 점의 크기와 색은 setColors 로 받는다(theme.js 의 boardColors).
 
 const TAU = Math.PI * 2;
@@ -18,6 +19,12 @@ const pack = ([r, g, b, a = 1]) => ((Math.round(a * 255) << 24) | (b << 16) | (g
 const mod = (a, n) => ((a % n) + n) % n;
 
 const PIXEL_BELOW = 4; // 칸이 이보다 작으면(기기 픽셀) 픽셀로
+const EYE = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+]; // 개미 눈이 가는 쪽(dir 0 위 · 1 오른쪽 · 2 아래 · 3 왼쪽)
 const SQUARE_BELOW = 6; // 이보다 작으면 둥근 점 대신 네모로, 빈칸 점은 그리지 않는다
 
 /** min·max 는 칸 한 변의 css px */
@@ -42,6 +49,8 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
   let slot = []; // STAY·ENTER·EXIT + 상태 번호, HEAD → fills 의 자리. 색이 같으면 한 경로에 모아 칠한다
   let packs = []; // 픽셀로 그릴 때의 색(STAY·ENTER·EXIT + 상태 번호, HEAD 자리 그대로)
   let HEAD = 0;
+  let AGE = 0; // 1차원 지난 줄: AGE + 나이(0 … ageMax)
+  let ageR = []; // 나이마다 점 반지름(칸 한 변에 대한 몫)
   let lattice = null;
   let latticeKey = "";
   let frameSize = null; // 끝이 있는 격자를 꼭 맞게 보일 때 { w, h }
@@ -86,6 +95,15 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
     for (const kind of ["color", "enter", "exit"]) for (let s = 0; s < n; s++) list.push(shape[s] ? (shape[s][kind] ?? shape[s].color) : colors.ink);
     HEAD = list.length;
     list.push(colors.head ?? colors.signal);
+    AGE = list.length;
+    ageR = [];
+    if (colors.age) {
+      for (let a = 0; a <= colors.ageMax; a++) {
+        const st = colors.age(a);
+        ageR.push(st.r);
+        list.push(st.color);
+      }
+    }
     const strs = list.map((x) => css(x, x[3] ?? 1));
     fills = [...new Set(strs)];
     slot = strs.map((x) => fills.indexOf(x));
@@ -211,7 +229,7 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
     const head = src.head ?? null;
     if (c < PIXEL_BELOW) drawPixels(src, v, head);
     else drawDots(src, v, ease(Math.max(0, Math.min(1, t))), head);
-    if (src.agents && src.agents.length) drawAgents(src.agents, v);
+    if (src.agents && src.agents.length) drawAgents(src.agents, src.trails, v);
     if (frameSize) ctx.restore();
     if (hover && !look) ring(hover[0], hover[1], css(col.ring), 1.25);
     if (look) drawLook(look);
@@ -228,6 +246,7 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
     const n = rad.length;
     const enter = ENTER();
     const exit = EXIT();
+    const aged = ageR.length > 0 && head !== null;
     src.blocks(x0, y0, x1, y1, (bx, by, bw, bh, cells, prev) => {
       const xa = Math.max(x0, bx);
       const xb = Math.min(x1, bx + bw - 1);
@@ -237,6 +256,8 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
         const row = (y - by) * bw - bx;
         const py = oy + (y + 0.5) * c;
         const fresh = y === head;
+        // 1차원의 지난 줄: 나이만큼 작고 옅게
+        const age = aged && !fresh ? Math.min(head - y, ageR.length - 1) : -1;
         for (let x = xa; x <= xb; x++) {
           const i = row + x;
           const v = cells[i];
@@ -244,7 +265,10 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
           if (!v && !p) continue;
           let r;
           let k;
-          if (v) {
+          if (age >= 0) {
+            r = c * ageR[age];
+            k = AGE + age;
+          } else if (v) {
             r = R(p) + (R(v) - R(p)) * e;
             k = fresh ? HEAD : v >= n ? STAY + 1 : p === v ? STAY + v : enter + v;
           } else {
@@ -282,6 +306,7 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
     } else u32.fill(0);
     const n = rad.length;
     const enter = ENTER();
+    const aged = ageR.length > 0 && head !== null;
     src.blocks(x0, y0, x1, y1, (bx, by, bw, bh, cells, prev) => {
       const xa = Math.max(x0, bx);
       const xb = Math.min(x1, bx + bw - 1);
@@ -291,10 +316,11 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
         const row = (y - by) * bw - bx;
         const out = (y - y0) * cols - x0;
         const fresh = y === head;
+        const age = aged && !fresh ? AGE + Math.min(head - y, ageR.length - 1) : -1;
         for (let x = xa; x <= xb; x++) {
           const v = cells[row + x];
           if (!v) continue;
-          u32[out + x] = packs[fresh ? HEAD : v >= n ? STAY + 1 : prev && prev[row + x] !== v ? enter + v : STAY + v];
+          u32[out + x] = packs[fresh ? HEAD : age >= 0 ? age : v >= n ? STAY + 1 : prev && prev[row + x] !== v ? enter + v : STAY + v];
         }
       }
     });
@@ -303,29 +329,45 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
     ctx.drawImage(off, ox + x0 * c, oy + y0 * c, cols * c, rows * c);
   }
 
-  /** 개미: 칸 위에 가는 쪽을 가리키는 세모. 칸이 작아도 찾을 수 있게 최소 크기를 둔다(모양은 임시) */
-  function drawAgents(list, { x0, y0, x1, y1 }) {
-    const s = Math.max(c * 0.46, 3.5 * dpr);
-    ctx.save();
-    ctx.fillStyle = css(col.agent ?? col.signal);
-    ctx.strokeStyle = css(col.bg);
-    ctx.lineWidth = Math.max(1, dpr);
-    ctx.lineJoin = "round";
-    for (const a of list) {
-      if (a.x < x0 - 2 || a.x > x1 + 2 || a.y < y0 - 2 || a.y > y1 + 2) continue;
-      const px = ox + (a.x + 0.5) * c;
-      const py = oy + (a.y + 0.5) * c;
-      const ang = (((a.dir ?? 0) & 3) * Math.PI) / 2;
-      const pt = (dx, dy) => [px + dx * Math.cos(ang) - dy * Math.sin(ang), py + dx * Math.sin(ang) + dy * Math.cos(ang)];
+  /**
+   * 개미: 바탕색 테두리를 두른 신호색 점(칸이 작아도 찾을 수 있게 최소 크기). 칸이 크면 가는 쪽에 바탕색 눈.
+   * 자취: 바로 앞 걸음 자리(오래된 것부터 6개까지)를 작고 옅은 점에서 크고 진한 점으로. 칸이 작으면 뺀다
+   */
+  function drawAgents(list, trails, { x0, y0, x1, y1 }) {
+    const at = (x, y) => [ox + (x + 0.5) * c, oy + (y + 0.5) * c];
+    const disc = (x, y, r, fill) => {
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.moveTo(...pt(0, -s));
-      ctx.lineTo(...pt(s * 0.82, s * 0.62));
-      ctx.lineTo(...pt(-s * 0.82, s * 0.62));
-      ctx.closePath();
-      ctx.stroke();
+      ctx.arc(x, y, r, 0, TAU);
       ctx.fill();
+    };
+    const bg = css(col.bg);
+    const sig = col.agent ?? col.signal;
+    const near = (x, y) => x >= x0 - 2 && x <= x1 + 2 && y >= y0 - 2 && y <= y1 + 2;
+    if (c >= 6 * dpr && trails) {
+      trails.forEach((tr) => {
+        const last = (tr ?? []).slice(-6);
+        last.forEach(([tx, ty], j) => {
+          if (!near(tx, ty)) return;
+          const k = (j + 1) / last.length;
+          const [px, py] = at(tx, ty);
+          const r = c * (0.13 + 0.15 * k);
+          disc(px, py, r + c * 0.07, bg);
+          disc(px, py, r, css(sig, 0.45 + 0.55 * k));
+        });
+      });
     }
-    ctx.restore();
+    for (const a of list) {
+      if (!near(a.x, a.y)) continue;
+      const [px, py] = at(a.x, a.y);
+      const r = Math.max(3.5 * dpr, c * 0.44);
+      disc(px, py, r + c * 0.08, bg);
+      disc(px, py, r, css(sig));
+      if (c >= 12 * dpr) {
+        const [dx, dy] = EYE[(a.dir ?? 0) & 3];
+        disc(px + dx * c * 0.2, py + dy * c * 0.2, c * 0.1, bg);
+      }
+    }
   }
 
   function ring(x, y, color, width, extra = 1.5) {
