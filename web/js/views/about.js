@@ -134,7 +134,7 @@ export function aboutView(main, { presets }) {
         h(
           "p",
           {},
-          t("동물생명공학전공 25학번 이영표. 버그 제보와 새 규칙 제안은 "),
+          t("서울대학교 동물생명공학전공 25학번 이영표. 버그 제보와 새 규칙 제안은 "),
           h("a", { href: "https://github.com/Archi142857/grid-game/issues", rel: "noopener" }, t("GitHub 이슈")),
           t("로 받아요."),
         ),
