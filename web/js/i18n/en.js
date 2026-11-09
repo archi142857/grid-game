@@ -2,7 +2,8 @@
 // 자리표: 한국어의 {n:이가} 는 영어에서 {n} 로 쓴다. 단수·복수는 {n|neighbor|neighbors} (값이 1이면 앞, 아니면 뒤).
 // 용어: 칸 cell · 산 칸 Alive / live cell · 빈칸 Empty / empty cell · 세대 generation · 태어남 Born · 살아남음 Survive
 //       도감 Field guide · 처음으로 Reset · 흩뿌리기 Scatter · 비우기 Clear · 손 Tool(이동 Move · 그리기 Draw · 살펴보기 Inspect)
-// 규칙 파일의 이름·상태 이름(콘웨이의 생명 게임, 꺼지는 중 …)도 여기 있다. 화면이 t(이름) 으로 부르면 영어가 나간다.
+// 규칙 파일의 이름·설명·상태 이름(콘웨이의 생명 게임, 꺼지는 중 …)도 여기 있다. app.js 가 t() 로 감싸 화면에 낸다.
+// index.html 의 고정 글은 app.js 가 data-t·data-t-aria 열쇠로 갈아 끼운다.
 
 export const EN = {
   // ── app.js ─────────────────────────────
@@ -635,17 +636,16 @@ export const EN = {
   "켜진 칸": "On",
   "상태 {k}": "State {k}",
 
-  // ── index.html 의 고정 글: 화면이 t() 로 붙이면 쓰인다 ─────────────────────────────
+  // ── index.html 의 고정 글(data-t·data-t-aria) ─────────────────────────────
   "본문으로 건너뛰기": "Skip to content",
   "Grid Game 첫 화면": "Grid Game home",
   "주 메뉴": "Main menu",
   "만들기": "Make",
-  "화면 밝기 바꾸기": "Change theme",
   "불러오는 중이에요…": "Loading…",
   "Grid Game. 설정은 이 브라우저에만 남아요.": "Grid Game. Your settings stay in this browser only.",
   "만든 사람과 출처": "Credits and sources",
 
-  // ── 규칙 파일의 이름·상태 이름(web/data/rules) ─────────────────────────────
+  // ── 규칙 파일의 이름·설명·상태 이름(web/data/rules) ─────────────────────────────
   "콘웨이의 생명 게임": "Conway's Game of Life",
   "켜짐": "On",
   "꺼짐": "Off",
@@ -672,6 +672,41 @@ export const EN = {
   "전자 머리": "Electron head",
   "전자 꼬리": "Electron tail",
   "도선": "Wire",
+
+  // 규칙 파일의 설명(도감 글이 없을 때 화면에 나오고, 내려받는 규칙 파일에도 들어간다)
+  "1970년 존 콘웨이가 만든 가장 유명한 세포 자동자예요. 두 줄짜리 규칙에서 기어가고, 깜빡이고, 끝없이 자라는 무늬가 나와요.":
+    "The most famous cellular automaton, made by John Conway in 1970. A two-line rule gives patterns that crawl, blink and grow forever.",
+  "생명 게임에 '이웃이 6개여도 태어남'을 하나 더한 규칙이에요. 스스로를 복제하는 작은 무늬가 살아요.":
+    "The Game of Life with one more rule: a cell is also born with 6 neighbors. A small pattern that copies itself lives here.",
+  "산 칸과 빈칸을 뒤바꿔도 똑같이 움직이는 규칙이에요. 낮과 밤처럼 두 땅이 맞서며 자라요.":
+    "A rule that behaves the same when live and empty cells are swapped. Two lands grow against each other, like day and night.",
+  "산 칸은 한 세대만 살고 사라져요. 그런데도 몇 칸만 있으면 폭발하듯 퍼져 판을 덮어요.":
+    "Live cells last only one generation. Even so, a few cells are enough to spread explosively and cover the board.",
+  "켜진 칸은 한 세대 동안 꺼지는 중이었다가 꺼져요. 작은 우주선이 쉴 새 없이 날아다녀요.":
+    "A cell that is on spends one generation dying, then turns off. Small spaceships fly around nonstop.",
+  "잘 죽지 않는 칸들이 자라며 벽과 복도가 또렷한 미로를 그려요.": "Hard-to-kill cells grow into a maze with crisp walls and corridors.",
+  "산 칸은 이웃이 3~5개면 버티고, 버티지 못한 칸은 두 단계에 걸쳐 사라져요. 날아다니는 무늬가 우주 전쟁처럼 부딪혀요.":
+    "A live cell holds on with 3 to 5 neighbors, and one that can't fades away over two steps. Flying patterns clash like a space battle.",
+  "빈칸에서는 오른쪽, 칠한 칸에서는 왼쪽으로 돌고, 밟은 칸을 뒤집은 뒤 한 칸 나아가요. 1만 걸음쯤 어지럽게 헤매다가 갑자기 곧게 뻗는 '고속도로'를 깔기 시작해요.":
+    "It turns right on an empty cell and left on a painted one, flips the cell, then moves forward one cell. After wandering chaotically for about 10,000 steps, it suddenly starts laying a straight 'highway'.",
+  "칸 색 네 가지를 차례로 칠하며 색마다 L·L·R·R 로 도는 개미예요. 자라면서 몇 번이고 대칭인 모양이 돼요.":
+    "An ant that paints four cell colors in turn, turning L, L, R, R on each color. As it grows, its drawing becomes symmetric over and over again.",
+  "칸 색 아홉 가지를 쓰는 개미예요. 제 둘레를 네모꼴로 빈틈없이 메우며 넓혀 가요.":
+    "An ant that uses nine cell colors. It fills a square around itself with no gaps and keeps widening it.",
+  "개미에게 속 상태가 둘 있는 터마이트예요. 빈 판에서 시작해 피보나치 나선을 그리며 커져요.":
+    "A turmite: an ant with two inner states. Starting on an empty grid, it grows while drawing a Fibonacci spiral.",
+  "한 줄짜리(1차원) 세포 자동자예요. 가운데 한 칸에서 시작해 세대가 아래로 쌓이는데, 규칙은 단순해도 무작위처럼 보이는 무늬가 나와요.":
+    "A one-row (1D) cellular automaton. Starting from a single cell in the middle, generations stack downward, and the simple rule makes a pattern that looks random.",
+  "양옆 두 칸 가운데 하나만 켜져 있으면 켜지는 1차원 규칙이에요. 한 칸에서 시작하면 시에르핀스키 삼각형이 끝없이 그려져요.":
+    "A 1D rule where a cell turns on when exactly one of its two side cells is on. Starting from one cell, it draws the Sierpiński triangle forever.",
+  "되풀이되는 바탕 위로 여러 모양이 오가며 부딪치는 1차원 규칙이에요. 이 규칙 하나로 어떤 계산이든 할 수 있다는 것(튜링 완전)이 증명됐어요.":
+    "A 1D rule where shapes travel across a repeating background and collide. It has been proved that this one rule can do any computation (it is Turing complete).",
+  "칸마다 이웃이 여섯인 육각 격자의 생명 게임이에요. 빈칸은 산 이웃이 2개면 태어나고, 산 칸은 3개나 4개면 살아남아요.":
+    "The Game of Life on a hexagonal grid, where every cell has six neighbors. An empty cell is born with 2 live neighbors, and a live cell survives with 3 or 4.",
+  "열네 가지 색이 고리를 돌아요. 다음 색인 이웃이 하나라도 있으면 그 색으로 넘어가요. 무작위로 칠한 판이 덩어리를 거쳐 끝내 소용돌이로 정리돼요.":
+    "Fourteen colors go around a cycle. A cell moves on to the next color if at least one neighbor has that color. A randomly painted board forms blobs and finally settles into spirals.",
+  "도선 위로 전자가 흘러요. 전자 머리는 꼬리가 되고, 꼬리는 도선으로 돌아가며, 도선은 이웃한 전자 머리가 1~2개일 때 머리가 돼요. 이것만으로 논리 회로를 만들 수 있어요.":
+    "Electrons flow along wires. An electron head becomes a tail, a tail turns back into wire, and wire becomes a head when 1 or 2 of its neighbors are electron heads. That's enough to build logic circuits.",
 
   // ── data/code-help.js: 코드로 규칙 쓰기 ─────────────────────────────
   "칸마다 부를 함수를 하나 써요. 함수는 지금 상태(state)와 상태별 이웃 수(counts)를 받아 다음 상태를 돌려줘요.":

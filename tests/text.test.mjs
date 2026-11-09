@@ -49,7 +49,10 @@ test("t() 의 열쇠는 따옴표 글이다(영어판을 붙일 때 찾을 수 �
   for (const f of jsFiles(join(ROOT, "web/js"))) assert.ok(!/\bt\(\s*`/.test(readFileSync(f, "utf8")), f);
 });
 
-/** 화면 글의 열쇠: web/js 의 t("…")(설명 줄은 빼고)와 도감 규칙 파일의 이름·상태 이름(화면이 t() 로 감싸 부른다) */
+/**
+ * 화면 글의 열쇠: web/js 의 t("…")(설명 줄은 빼고), index.html 의 data-t·data-t-aria 글(app.js 가 갈아 끼운다),
+ * 도감 규칙 파일의 이름·설명·상태 이름(app.js 가 t() 로 감싸 화면에 낸다)
+ */
 function screenKeys() {
   const keys = new Set();
   for (const f of jsFiles(join(ROOT, "web/js"))) {
@@ -60,12 +63,16 @@ function screenKeys() {
       .replace(/\/\*[\s\S]*?\*\//g, "");
     for (const m of src.matchAll(/(?<![\w$.])t\(\s*"((?:[^"\\]|\\.)*)"/g)) keys.add(JSON.parse(`"${m[1]}"`));
   }
+  const unescape = (s) => s.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  const html = readFileSync(join(ROOT, "web/index.html"), "utf8").replace(/<!--[\s\S]*?-->/g, "");
+  for (const m of html.matchAll(/\sdata-t(?:-aria)?="([^"]*)"/g)) keys.add(unescape(m[1]));
   // 규칙 파일은 도감 목록에 아직 없는 것(다음 계열)까지 본다
   const dir = join(ROOT, "web/data/rules");
   for (const name of readdirSync(dir)) {
     if (!name.endsWith(".json") || name === "index.json") continue;
     const file = JSON.parse(readFileSync(join(dir, name), "utf8"));
     keys.add(file.name);
+    if (file.description) keys.add(file.description);
     for (const s of file.states ?? []) keys.add(s.name);
   }
   return keys;
