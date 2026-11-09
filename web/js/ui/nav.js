@@ -15,6 +15,7 @@ const read = (v) => (typeof v === "function" ? v() : v);
 export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", touch = "full", onTap, onStroke, onView, onHover, onHint }) {
   const pts = new Map(); // pointerId → { x, y }
   let mode = null; // null · "maybe" · "pan" · "stroke" · "tap" · "pinch" · "done"
+  let swiped = false; // "tap" 에서 한 손가락으로 옆으로 끌었다(뗄 때 안내를 한 번 더 띄운다)
   let first = null; // { id, x, y, type, cell }
   let stroke = null;
   let last = null;
@@ -117,7 +118,10 @@ export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", t
       mode = "done";
       // 한 손가락으로 옆으로 끌면 격자도 쪽도 안 움직이니 둘러보는 법을 알려 준다.
       // 세로로 쓸면 브라우저가 쪽을 내리고(pointercancel) 그게 맞는 동작이라 알리지 않는다
-      if (onHint && Math.abs(e.clientX - first.x) > Math.abs(e.clientY - first.y)) onHint("touch");
+      if (onHint && Math.abs(e.clientX - first.x) > Math.abs(e.clientY - first.y)) {
+        swiped = true;
+        onHint("touch");
+      }
       return;
     }
     if (mode === "maybe") {
@@ -153,6 +157,9 @@ export function attachNav(canvas, board, { tool = () => "pan", wheel = "zoom", t
     }
     if (first && e.pointerId === first.id) {
       if (!cancelled && (mode === "maybe" || mode === "tap") && onTap && first.cell) onTap(first.cell);
+      // 길게 끌면 안내가 손가락 밑에서 사라질 수 있어, 뗄 때 다시 띄워 뗀 뒤에도 읽을 수 있게 한다
+      if (swiped && !cancelled && onHint) onHint("touch");
+      swiped = false;
       if (mode === "stroke") endStroke();
       first = null;
     }
