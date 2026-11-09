@@ -364,4 +364,4 @@ const TIPS = {
 export const MAKE_TIPS = (family = "life") => TIPS[family]?.() ?? [];
 
 /** 아직 돌릴 수 없는 규칙(다음 단계) */
-export const SOON = () => [t("와이어월드"), t("규칙 30")];
+export const SOON = () => [t("육각 생명"), t("14색 순환")];

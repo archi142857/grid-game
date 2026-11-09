@@ -322,6 +322,8 @@ export const EN = {
     "The field guide collects {n} famous rules. Press the Born and Survive numbers to change a rule, or make a brand-new one.",
   "칸 위를 걷는 개미도 있어요. 칸 색마다 개미가 도는 쪽을 글자(L·R·N·U)로 정해 나만의 개미를 만들 수 있고, 속 상태가 있는 터마이트도 도감에 있어요.":
     "There are ants that walk across the cells, too. Pick a turn letter (L, R, N or U) for each cell color to make an ant of your own, and the field guide also has a turmite with inner states.",
+  "한 줄이 세대마다 아래로 쌓이는 1차원 규칙과, 상태마다 언제 무엇으로 바뀔지 줄로 적는 조건표도 있어요. 조건표로는 도선 위로 전자가 흐르는 와이어월드 같은 규칙을 만들 수 있어요.":
+    "There are also 1D rules, where one row per generation stacks downward, and table rules, where you write lines saying when each state changes and into what. With table rules you can build rules like Wireworld, where electrons flow along wires.",
   "처음이라면 첫 화면의 점 단추만 눌러 봐도 충분해요. 더 파고들고 싶다면 B3/S23 같은 표기를 바로 고쳐 쓰거나, 규칙 파일을 내려받아 고친 뒤 다시 불러오세요. 가입은 없고, 설정은 이 브라우저에만 남아요.":
     "If you're new, pressing the dot buttons on the home page is enough. To dig deeper, edit notation like B3/S23 directly, or download a rule file, change it and open it again. There's no sign-up, and your settings stay in this browser only.",
   "세포 자동자의 짧은 역사": "A short history of cellular automata",
@@ -331,6 +333,7 @@ export const EN = {
   "존 콘웨이의 생명 게임이 마틴 가드너의 칼럼에 실려 널리 알려졌어요.": "John Conway's Game of Life became widely known through Martin Gardner's column.",
   "스티븐 울프럼이 한 줄짜리 세포 자동자 256가지를 체계적으로 살폈어요.": "Stephen Wolfram systematically studied all 256 one-row cellular automata.",
   "크리스 랭턴이 칸 위를 걷는 개미 규칙을 내놓았어요.": "Chris Langton introduced an ant that walks across the cells.",
+  "브라이언 실버먼이 도선 위로 전자가 흐르는 와이어월드를 만들었어요.": "Brian Silverman created Wireworld, where electrons flow along wires.",
   "하이라이프, 낮과 밤, 브라이언의 뇌처럼 생명 게임을 고친 규칙이 많이 나왔어요.": "Many variations on the Game of Life appeared, such as HighLife, Day & Night and Brian's Brain.",
   "B 뒤의 숫자는 빈칸이 태어나는 산 이웃 수, S 뒤의 숫자는 산 칸이 살아남는 산 이웃 수예요. 상태가 셋 이상이면 C 뒤에 상태 수를 붙여요. 생명 게임은 B3/S23, 브라이언의 뇌는 B2/S/C3 이에요.":
     "The digits after B are the live-neighbor counts at which an empty cell is born, and the digits after S are the counts at which a live cell survives. With three or more states, the number of states comes after C. The Game of Life is B3/S23, and Brian's Brain is B2/S/C3.",
