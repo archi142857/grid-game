@@ -26,10 +26,10 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<a class="skip" href="#main" id="skip">본문으로 건너뛰기</a>
+<a class="skip" href="#main" id="skip" data-t="본문으로 건너뛰기">본문으로 건너뛰기</a>
 <header class="top" id="top">
   <div class="top-in">
-    <a class="brand" href="#/" aria-label="Grid Game 첫 화면">
+    <a class="brand" href="#/" aria-label="Grid Game 첫 화면" data-t-aria="Grid Game 첫 화면">
       <svg viewBox="0 0 30 30" aria-hidden="true">
         <g fill="currentColor" opacity="0.16"><circle cx="5" cy="5" r="2"/><circle cx="25" cy="5" r="2"/><circle cx="5" cy="15" r="2"/><circle cx="15" cy="15" r="2"/></g>
         <g fill="currentColor"><circle cx="15" cy="5" r="4.2"/><circle cx="25" cy="15" r="4.2"/><circle cx="5" cy="25" r="4.2"/><circle cx="15" cy="25" r="4.2"/></g>
@@ -37,20 +37,21 @@
       </svg>
       <span class="brand-word">GRID GAME</span>
     </a>
-    <nav class="nav" aria-label="주 메뉴">
-      <a href="#/" data-nav="home">도감</a>
-      <a href="#/make" data-nav="make">만들기</a>
-      <a href="#/about" data-nav="about">소개</a>
+    <nav class="nav" aria-label="주 메뉴" data-t-aria="주 메뉴">
+      <a href="#/" data-nav="home" data-t="도감">도감</a>
+      <a href="#/make" data-nav="make" data-t="만들기">만들기</a>
+      <a href="#/about" data-nav="about" data-t="소개">소개</a>
     </nav>
     <button class="icon-btn" type="button" id="theme-btn" aria-label="화면 밝기 바꾸기"></button>
   </div>
 </header>
-<main id="main" tabindex="-1"><div class="wrap"><p class="loading">불러오는 중이에요…</p></div></main>
+<main id="main" tabindex="-1"><div class="wrap"><p class="loading" data-t="불러오는 중이에요…">불러오는 중이에요…</p></div></main>
 <footer class="foot">
   <div class="wrap">
-    <span>Grid Game. 설정은 이 브라우저에만 남아요.</span>
-    <a href="#/about">만든 사람과 출처</a>
+    <span data-t="Grid Game. 설정은 이 브라우저에만 남아요.">Grid Game. 설정은 이 브라우저에만 남아요.</span>
+    <a href="#/about" data-t="만든 사람과 출처">만든 사람과 출처</a>
     <a href="https://github.com/Archi142857/grid-game" rel="noopener">GitHub</a>
+    <button class="text-btn lang-btn" type="button" id="lang-btn" lang="en">English</button>
   </div>
 </footer>
 <noscript><p style="padding:24px">자바스크립트를 켜야 쓸 수 있어요. / Please turn on JavaScript.</p></noscript>

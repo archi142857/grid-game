@@ -1,11 +1,13 @@
-// 화면 이동(주소의 # 뒤를 본다)과 밝기 설정.
+// 화면 이동(주소의 # 뒤를 본다)과 밝기·언어 설정.
 //   #/            첫 화면과 도감
 //   #/r/<id>      도감 규칙 하나 (?rule=B36/S23 로 고친 규칙)
 //   #/make        새 규칙 만들기 (?rule=…)
 //   #/about       소개
+// 언어: 주소의 ?lang=en(# 앞)이나 머리 줄의 언어 단추. 고른 언어는 이 브라우저에 남긴다(store 'lang')
 
 import { clear, h, icon, setTitle } from "./ui/dom.js";
-import { t } from "./i18n.js";
+import { t, lang, setLang } from "./i18n.js";
+import { load, save } from "./ui/store.js";
 import { applyScheme, cycleScheme, scheme } from "./ui/theme.js";
 import { loadPresets } from "./data/presets.js";
 import { homeView } from "./views/home.js";
@@ -24,7 +26,16 @@ function parse() {
   return { path, params: Object.fromEntries(new URLSearchParams(query)) };
 }
 
-function route() {
+/** 도감 규칙의 이름·설명·상태 이름을 지금 언어로(사전에 없으면 그대로) */
+const localRule = (r) => ({
+  ...r,
+  name: t(r.name),
+  description: r.description ? t(r.description) : r.description,
+  states: r.states.map((s) => ({ ...s, name: t(s.name) })),
+});
+
+/** keep: 언어를 바꿔 다시 그릴 때처럼 쪽 위치와 포커스를 그대로 둔다 */
+function route({ keep = false } = {}) {
   if (current && current.destroy) {
     try {
       current.destroy();
@@ -38,16 +49,17 @@ function route() {
   const { path, params } = parse();
   let nav = "home";
   try {
-    if (path === "/" || path === "") current = homeView(main, { presets });
+    const local = presets.map(localRule);
+    if (path === "/" || path === "") current = homeView(main, { presets: local });
     else if (path === "/make") {
       nav = "make";
       current = ruleView(main, { params });
     } else if (path === "/about") {
       nav = "about";
-      current = aboutView(main, { presets });
+      current = aboutView(main, { presets: local });
     } else if (path.startsWith("/r/")) {
       const id = decodeURIComponent(path.slice(3));
-      const preset = presets.find((p) => p.id === id);
+      const preset = local.find((p) => p.id === id);
       current = preset ? ruleView(main, { preset, params }) : notFound(main);
     } else current = notFound(main);
   } catch (e) {
@@ -59,14 +71,14 @@ function route() {
     if (a.dataset.nav === nav) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
-  if (!first) {
+  if (!first && !keep) {
     window.scrollTo(0, 0);
     main.focus({ preventScroll: true });
   }
   first = false;
 }
 
-window.addEventListener("hashchange", route);
+window.addEventListener("hashchange", () => route());
 
 // 마우스·손가락으로 누른 단추는 포커스를 바로 놓는다(사파리와 같다). 그래야 스페이스·→ 가 방금 누른
 // 단추를 다시 누르지 않고 격자로 간다. 키보드로 누른 단추(e.detail 이 0)는 포커스를 그대로 둔다
@@ -119,6 +131,47 @@ themeBtn.addEventListener("click", () => {
   themeButton();
 });
 
+// ── 언어: 한국어 ↔ 영어 ─────────────────
+// 단추(지금은 바닥 줄)에는 바꿀 언어의 이름을 그 언어로 적는다(English · 한국어)
+const langBtn = document.getElementById("lang-btn");
+function langButton() {
+  const to = lang() === "ko" ? "en" : "ko";
+  langBtn.textContent = to === "en" ? "English" : "한국어";
+  langBtn.lang = to;
+}
+/** index.html 에 적힌 글(data-t, data-t-aria)을 지금 언어로 */
+function translateStatic() {
+  document.querySelectorAll("[data-t]").forEach((el) => (el.textContent = t(el.dataset.t)));
+  document.querySelectorAll("[data-t-aria]").forEach((el) => el.setAttribute("aria-label", t(el.dataset.tAria)));
+}
+function useLang(l) {
+  setLang(l);
+  translateStatic();
+  langButton();
+  themeButton();
+}
+/** 주소의 ?lang= 이 먼저, 없으면 남겨 둔 언어 */
+function startLang() {
+  const asked = new URLSearchParams(location.search).get("lang");
+  if (asked === "ko" || asked === "en") save("lang", asked);
+  const l = asked === "ko" || asked === "en" ? asked : load("lang", "ko");
+  useLang(l === "en" ? "en" : "ko");
+}
+langBtn.addEventListener("click", () => {
+  const y = window.scrollY;
+  useLang(lang() === "ko" ? "en" : "ko");
+  save("lang", lang());
+  if (!presets.length) return;
+  // 다시 그리는 동안 쪽 높이가 줄었다 늘어도 보던 자리로 돌아오게, 높이를 잠깐 붙잡아 둔다
+  main.style.minHeight = `${main.offsetHeight}px`;
+  route({ keep: true });
+  window.scrollTo(0, y);
+  requestAnimationFrame(() => {
+    window.scrollTo(0, y);
+    main.style.minHeight = "";
+  });
+});
+
 // 내려가면 머리 아래에 선을 긋는다
 const top = document.getElementById("top");
 const onScroll = () => top.classList.toggle("scrolled", window.scrollY > 4);
@@ -127,7 +180,7 @@ window.addEventListener("scroll", onScroll, { passive: true });
 async function boot() {
   onScroll();
   applyScheme();
-  themeButton();
+  startLang();
   try {
     presets = await loadPresets();
   } catch (e) {
