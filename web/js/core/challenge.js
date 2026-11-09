@@ -2,7 +2,8 @@
 // 문제: { id, family, rule, start, limits: { cells?, minCells?, box?: [w, h] }, goal: { type, … } }
 //   rule: 표기(B3/S23 · W90) 또는 "choose"(답에서 고름)
 //   start: "empty"(답의 칸을 놓음) · "single"(가운데 한 칸) · RLE 글(왼쪽 위가 (0, 0))
-//   goal.type: survive { gens } · period { p } · ship { within } · grow { gens, min } · match { gens, rule | frames | final }
+//   goal.type: survive { gens, noRepeat? } · period { p } · ship { within } · grow { gens, min } · match { gens, rule | frames | final }
+//   survive 의 noRepeat: gens 세대 동안 같은 모양(자리는 보지 않음)이 두 번 나오면 탈락(블록·깜빡이·글라이더처럼 되풀이되는 무늬를 막는다)
 //   match 의 정답은 rule(표기), frames(세대마다 모습 gens+1 장) 또는 final(gens 세대의 모습 한 장. 1차원은 지난 줄이 다 남아 있어 이것으로 충분)
 // 답: { cells: [[x, y(, 상태)]…] }(칸을 놓는 문제) · { rule: "B36/S23" }(규칙을 고르는 문제)
 // judge 는 { ok, why, gen?, value? } 를 돌려준다. why 는 낱말이고 글은 화면 쪽이 만든다.
@@ -32,6 +33,18 @@ function snap(sim) {
   return { x: b.x0, y: b.y0, rows: readRows(sim, b) };
 }
 const shapeKey = (s) => (s ? s.rows.map((r) => r.join(",")).join("/") : "");
+
+/** 모양 열쇠: 네모 왼쪽 위를 (0, 0) 으로 옮긴 빈칸 아닌 칸들(자리와 상태)을 줄 순서로. 판이 넓어도 칸 수만큼만 든다 */
+function cellShape(sim) {
+  const b = sim.bounds();
+  if (!b) return "";
+  const out = [];
+  sim.blocks(b.x0, b.y0, b.x1, b.y1, (ox, oy, w, h, cells) => {
+    for (let i = 0; i < w * h; i++) if (cells[i]) out.push([oy + Math.floor(i / w) - b.y0, ox + (i % w) - b.x0, cells[i]]);
+  });
+  out.sort((a, c) => a[0] - c[0] || a[1] - c[1]);
+  return out.map((c) => c.join(",")).join(" ");
+}
 const fullKey = (s) => (s ? `${s.x},${s.y}|${shapeKey(s)}` : "");
 
 /** match 의 frames 한 장: { x, y, rle } 또는 null(빈 판) */
@@ -105,7 +118,7 @@ export function setup(problem, answer = {}) {
  *   why(맞음): ok
  *   why(틀림): problem(문제 파일이 틀림) · rule(고른 규칙을 못 읽음/계열이 다름) · locked(돌릴 수 없는 규칙) · cell(칸 값이 틀림)
  *     empty(칸이 없음) · toomany·toofew(칸 수, value) · outside(네모를 넘음, value [w, h])
- *     died(gen 세대에 다 사라짐) · early(gen 세대에 벌써 처음 모습) · period(p 세대 뒤 처음 모습이 아님)
+ *     died(gen 세대에 다 사라짐) · repeat(gen 세대에 value 세대와 같은 모양이 다시 나옴) · early(gen 세대에 벌써 처음 모습) · period(p 세대 뒤 처음 모습이 아님)
  *     noship(within 세대 안에 옮겨 간 같은 모양이 없음) · small(gens 세대 뒤 산 칸 value 개) · differs(gen 세대부터 달라짐) · wide(너무 넓게 퍼짐)
  */
 export function judge(problem, answer = {}) {
@@ -119,9 +132,15 @@ export function judge(problem, answer = {}) {
   const advance = () => sim.step() !== null;
 
   if (goal.type === "survive") {
+    const seen = goal.noRepeat ? new Map([[cellShape(sim), 0]]) : null;
     for (let g = 1; g <= goal.gens; g++) {
       if (!advance()) return yes({ gen: g - 1 }); // 너무 넓게 퍼져도 살아 있다
       if (!sim.bounds()) return no("died", { gen: g });
+      if (seen) {
+        const k = cellShape(sim);
+        if (seen.has(k)) return no("repeat", { gen: g, value: seen.get(k) });
+        seen.set(k, g);
+      }
     }
     return yes();
   }

@@ -27,15 +27,16 @@ const KNOWN = {
   "life-p3": { cells: cells("2b3o3b3o2$o4bobo4bo$o4bobo4bo$o4bobo4bo$2b3o3b3o2$2b3o3b3o$o4bobo4bo$o4bobo4bo$o4bobo4bo2$2b3o3b3o!") }, // 펄서
   "life-ship": { cells: cells("bo$2bo$3o!") }, // 글라이더
   "life-survive": { cells: cells("b2o$2o$bo!") }, // R-펜토미노
+  "life-no-repeat": { cells: cells("b2o$2o$bo!") }, // R-펜토미노(1103세대까지 같은 모양이 안 나온다)
   "highlife-grow": { cells: cells("2b3o$bo2bo$o3bo$o2bo$3o!") }, // 복제자
   "rule-sierpinski": { rule: "W90" },
   "guess-life": { rule: "B36/S23" }, // 하이라이프
 };
 
-test("문제 파일: 첫 묶음 여덟 문제가 설계 9절의 꼴대로 있다", () => {
+test("문제 파일: 첫 묶음(설계 9절의 여덟 문제와 같은 모양 없이 버티기)이 꼴대로 있다", () => {
   assert.deepEqual(
     LIST.map((p) => p.id),
-    ["life-still", "life-p2", "life-p3", "life-ship", "life-survive", "highlife-grow", "rule-sierpinski", "guess-life"],
+    ["life-still", "life-p2", "life-p3", "life-ship", "life-survive", "life-no-repeat", "highlife-grow", "rule-sierpinski", "guess-life"],
   );
   for (const p of LIST) {
     assert.ok(["life", "elementary"].includes(p.family), p.id);
@@ -83,6 +84,11 @@ test("틀린 답은 까닭과 함께 막힌다", () => {
   assert.deepEqual(no("life-ship", { cells: cells("bo2bo$o$o3bo$4o!") }), { ok: false, why: "toomany", value: 9 });
   assert.equal(no("life-ship", {}).why, "empty");
   assert.deepEqual(no("life-survive", { cells: [[0, 0]] }), { ok: false, why: "died", gen: 1 });
+  assert.deepEqual(no("life-no-repeat", { cells: cells("2o$2o!") }), { ok: false, why: "repeat", gen: 1, value: 0 }, "블록은 그대로라 바로 되풀이");
+  assert.deepEqual(no("life-no-repeat", { cells: cells("3o!") }), { ok: false, why: "repeat", gen: 2, value: 0 }, "깜빡이는 두 세대마다");
+  assert.deepEqual(no("life-no-repeat", { cells: cells("bo$2bo$3o!") }), { ok: false, why: "repeat", gen: 4, value: 0 }, "글라이더는 자리가 달라도 같은 모양");
+  assert.equal(no("life-no-repeat", { cells: [[0, 0]] }).why, "died");
+  assert.equal(judge(P("life-no-repeat"), { cells: cells("2o$b2o$bo!") }).ok, true, "R-펜토미노를 뒤집은 것도");
   assert.equal(no("life-survive", { cells: cells("6bo$2o$bo3b3o!") }).why, "toomany", "다이하드는 7칸");
   assert.equal(no("highlife-grow", { cells: cells("2o$2o!") }).why, "small");
   assert.equal(no("rule-sierpinski", { rule: "W30" }).why, "differs");
