@@ -203,7 +203,7 @@ button {
   color: var(--ink-2);
   font-weight: 550;
   line-height: 1.3;
-  white-space: nowrap; /* Field guide 가 두 줄로, Make 가 Mak/e 로 끊기지 않게 */
+  white-space: nowrap; /* 영어 메뉴가 두 줄로, Make 가 Mak/e 로 끊기지 않게 */
 }
 .nav a:hover {
   color: var(--ink);
@@ -2139,7 +2139,7 @@ html.has-full body {
   }
 }
 
-/* 좁은 폰(360px 안팎): 머리 줄 메뉴 셋이 영어(Field guide·Make·About)여도 한 줄에 서게 사이를 줄인다 */
+/* 좁은 폰(360px 안팎): 머리 줄 메뉴 셋이 영어(Catalog·Make·About)여도 한 줄에 서게 사이를 줄인다 */
 @media (max-width: 400px) {
   .top-in {
     gap: 8px;
