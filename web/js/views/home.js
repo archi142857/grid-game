@@ -33,6 +33,7 @@ const THUMB_GENS = {
   "rule-30": 40,
   "rule-90": 63,
   "rule-110": 56,
+  wireworld: 20,
 };
 
 export function homeView(main, { presets }) {

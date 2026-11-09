@@ -95,8 +95,9 @@ export function boardColors(states, family = "life") {
   } else if (family === "table") {
     const last = C - 1;
     for (let k = 1; k < C; k++) {
-      if (k === 1) shape[k] = dot(k, R, signal);
-      else if (k === 2) shape[k] = dot(k, K.tail, signal);
+      // 신호색 상태(머리·꼬리)는 signal 표시를 붙여 둔다(편집기의 상태 견본이 .signal 을 쓴다)
+      if (k === 1) shape[k] = { ...dot(k, R, signal), signal: true };
+      else if (k === 2) shape[k] = { ...dot(k, K.tail, signal), signal: true };
       else shape[k] = dot(k, last === 3 ? K.wire : R - ((R - K.wire) * (k - 3)) / (last - 3), ink);
     }
   } else if (family === "elementary") {

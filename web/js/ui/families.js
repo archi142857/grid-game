@@ -4,15 +4,31 @@
 // 모양(클래스·색)은 디자인 시안이 오기 전까지 있는 것(.pad·.count·.stepper)을 빌려 쓴다.
 
 import { h, icon, ICON } from "./dom.js";
-import { t, num } from "../i18n.js";
+import { t, num, lang } from "../i18n.js";
+import { josa } from "../core/josa.js";
 import { MAX_STATES } from "../core/life.js";
 import { resizeStates } from "../core/rules.js";
-import { around, MAX_ANT_COLORS, MAX_AGENTS } from "../core/sim.js";
+import { around, MAX_ANT_COLORS, MAX_AGENTS, MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED } from "../core/sim.js";
+import { tableProblem, countedStates, WIREWORLD } from "../core/table.js";
 import { makeRulePad, describeRule, blockedReason } from "./rulepad.js";
 import { boardColors } from "./theme.js";
 import { LIFE_WORDS } from "./spark.js";
 
 const copy = (o) => structuredClone(o);
+
+/**
+ * 상태 견본(.swatch): 판의 점과 같은 크기. 빈칸은 .empty, 신호색 상태는 .signal, 색을 적은 상태는 그 색.
+ * look 은 boardColors(rule.states, rule.family) 의 결과
+ */
+export function stateSwatch(look, i, states = []) {
+  if (i === 0) return h("span", { class: "swatch empty" });
+  const sh = look.shape[i];
+  return h("span", {
+    class: sh?.signal ? "swatch signal" : "swatch",
+    vars: { "--r": String(+(sh?.r ?? 0.4).toFixed(3)) },
+    style: states[i]?.color ? { color: states[i].color } : null,
+  });
+}
 
 /** 끝없는 격자에서 돌릴 수 없는 까닭(core/rules.js 의 lockOf 낱말) → 화면 글 */
 export const LOCK_TEXT = {
@@ -54,7 +70,7 @@ const life = {
     draw: () => t("끌어서 칸을 그려요. 산 칸에서 시작하면 지워요. 둘러보려면 오른쪽 단추나 두 손가락으로 끌어요."),
     look: () => t("칸에 커서를 올리거나 눌러 보세요. 이웃을 세고 다음 세대를 알려 줘요."),
   },
-  words: { ...LIFE_WORDS, step: () => t("세대"), count: () => t("산 칸") },
+  words: { ...LIFE_WORDS, step: () => t("세대"), count: () => t("산 칸"), paint: () => t("칠할 상태") },
   canvasLabel: () => t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 살리거나 비워요"),
   /** 만들기 화면의 처음 규칙 */
   blank: () => ({
@@ -111,13 +127,13 @@ const life = {
   /** 빈 판 안내(없으면 null) */
   hint: (world, tool) =>
     world.count > 0 ? null : tool === "draw" ? t("끌어서 칸을 그린 다음, 재생을 눌러 보세요.") : t("칸을 눌러 살릴 칸을 고른 다음, 재생을 눌러 보세요."),
-  /** 이동 손으로 칸을 눌렀을 때 */
-  tap(world, x, y) {
-    world.set(x, y, world.get(x, y) === 1 ? 0 : 1);
+  /** 이동 손으로 칸을 눌렀을 때. paint 는 칠할 상태(상태가 셋 이상일 때 고른다, 기본은 산 칸) */
+  tap(world, x, y, paint = 1) {
+    world.set(x, y, world.get(x, y) === paint ? 0 : paint);
     return null;
   },
-  /** 그리기 손: 시작한 칸이 산 칸이면 지우고, 아니면 살린다 */
-  strokeValue: (cur) => (cur === 1 ? 0 : 1),
+  /** 그리기 손: 시작한 칸이 칠할 상태면 지우고, 아니면 칠한다 */
+  strokeValue: (cur, paint = 1) => (cur === paint ? 0 : paint),
   /** 살펴보기에서 고리를 두를 칸 */
   lookCells: (ex, [x, y]) => around(x, y),
   peek(ex, rule) {
@@ -285,6 +301,7 @@ const ant = {
     count: () => t("칠한 칸"),
     // 개미는 한 걸음에 늘 개미 수만큼 칸이 바뀌어서 '바뀐 칸' 대신 개미 수를 보인다
     changed: () => t("개미"),
+    paint: () => t("칠할 색"),
   },
   changed: (world) => world.agents.length,
   canvasLabel: () => t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 칸 색이 바뀌어요"),
@@ -325,7 +342,8 @@ const ant = {
     world.set(x, y, (world.get(x, y) + 1) % world.rule.states.length);
     return null;
   },
-  strokeValue: (cur) => (cur !== 0 ? 0 : 1),
+  /** 그리기 손: 시작한 칸이 칠할 색이면 지우고, 아니면 칠한다(이동 손은 색을 하나씩 넘긴다) */
+  strokeValue: (cur, paint = 1) => (cur === paint ? 0 : paint),
   /** 개미 손: 놓기 → 돌리기 → 치우기. 더 못 놓으면 알릴 글 */
   placeAgent(world, x, y) {
     return world.sim.cycleAgent(x, y) === null ? t("개미는 {n}마리까지 놓을 수 있어요.", { n: MAX_AGENTS }) : null;
@@ -475,6 +493,291 @@ const elementary = {
   },
 };
 
+// ── 조건표 ─────────────────
+
+const ALL_COUNTS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+const copyRow = (tr) => (tr.when ? { from: tr.from, to: tr.to, when: { state: tr.when.state, count: [...tr.when.count] } } : { from: tr.from, to: tr.to });
+/** 한국어 조사만(영어에서는 없음) */
+const particle = (word, pair) => (lang() === "ko" ? josa(word, pair).slice(String(word).length) : "");
+
+/** 조건표 줄이 맞지 않는 까닭(core/table.js 의 tableProblem 낱말) → 화면 글 */
+function tableProblemText(p) {
+  if (p.why === "lock") return LOCK_TEXT.empty();
+  if (p.why === "many") return t("세는 상태는 {max}가지까지예요. 다른 줄에서 세는 상태를 골라 보세요.", { max: MAX_COUNTED });
+  if (p.why === "list") return t("줄은 {max}개까지예요.", { max: MAX_TRANSITIONS });
+  if (p.why === "zero") return t("빈칸은 셀 수 없어요.");
+  return t("이 줄은 쓸 수 없어요.");
+}
+
+/**
+ * 조건표 줄 편집기(사용자가 고른 시안 A): 줄마다 [지금 상태] → [바뀔 상태], 조건이 없으면 '늘',
+ * 있으면 아랫줄에 '이웃의 [셀 상태]가 [0–8]개면'. 상태 단추는 누를 때마다 다음 상태로(Shift 는 앞 상태로).
+ * '늘'을 누르면 조건이 붙고(처음에는 0–8 모두라 움직임은 그대로), 셀 상태를 마지막 다음으로 넘기면 다시 '늘'.
+ * 끝없는 격자에서 못 돌리는 줄(이웃 없는 빈칸이 바뀜)이나 세는 상태가 셋이 되는 줄은 건너뛰거나 막고 까닭을 띄운다
+ */
+function makeTablePad({ get, set, locked }) {
+  const list = h("ol", { class: "trs", "aria-label": t("조건표 줄") });
+  const add = h("button", { class: "btn small", type: "button", onclick: (e) => addRow(e) }, t("줄 더하기"));
+  const el = h("div", { class: "table-pad" }, list, h("div", { class: "file-row" }, add));
+  let rows = []; // 줄마다 { li, counts: [단추 9개] | null }
+  let marked = null;
+
+  /** 줄 목록을 바꿔 본다. 쓸 수 없으면 까닭을 띄우고 거짓 */
+  function apply(trs) {
+    const p = tableProblem(trs, get().states.length);
+    if (p) {
+      locked(tableProblemText(p));
+      return false;
+    }
+    const r = copy(get());
+    r.transitions = trs;
+    set(r);
+    return true;
+  }
+
+  /** 줄 i 의 from·to·of(셀 상태, null 이면 '늘')를 dir 쪽으로 넘긴다. 쓸 수 없는 값은 건너뛴다 */
+  function cycle(i, field, dir) {
+    const r = get();
+    const n = r.states.length;
+    const row = r.transitions[i];
+    const opts = field === "of" ? [...Array.from({ length: n - 1 }, (_, k) => k + 1), null] : Array.from({ length: n }, (_, k) => k);
+    const cur = field === "from" ? row.from : field === "to" ? row.to : row.when ? row.when.state : null;
+    const at = Math.max(0, opts.indexOf(cur));
+    let skipped = null;
+    for (let k = 1; k < opts.length; k++) {
+      const v = opts[(at + dir * k + opts.length * k) % opts.length];
+      const trs = r.transitions.map(copyRow);
+      const tr = trs[i];
+      if (field === "from") tr.from = v;
+      else if (field === "to") tr.to = v;
+      else if (v === null) delete tr.when;
+      else tr.when = { state: v, count: tr.when ? tr.when.count : [...ALL_COUNTS] };
+      const p = tableProblem(trs, n);
+      if (p) {
+        skipped = skipped ?? p;
+        continue;
+      }
+      set({ ...copy(r), transitions: trs });
+      if (skipped) locked(tableProblemText(skipped));
+      return;
+    }
+    if (skipped) locked(tableProblemText(skipped));
+  }
+
+  /** '늘'인 줄에 조건을 붙인다: 이미 세는 상태가 있으면 그것, 없으면 상태 1. 처음에는 0–8 모두(움직임은 그대로) */
+  function addWhen(i) {
+    const r = get();
+    const trs = r.transitions.map(copyRow);
+    const state = countedStates(r.transitions)[0] ?? 1;
+    trs[i].when = { state, count: [...ALL_COUNTS] };
+    apply(trs);
+  }
+
+  function toggleCount(i, c) {
+    const trs = get().transitions.map(copyRow);
+    const w = trs[i].when;
+    const s = new Set(w.count);
+    if (s.has(c)) s.delete(c);
+    else s.add(c);
+    w.count = [...s].sort((a, b) => a - b);
+    apply(trs);
+  }
+
+  function removeRow(i) {
+    const trs = get().transitions.map(copyRow);
+    trs.splice(i, 1);
+    apply(trs);
+  }
+
+  /** 새 줄은 맨 아래에 '상태 1 → 상태 1 늘'(아무것도 안 바뀌는 줄). 단추를 눌러 고친다. 키보드로 더했으면 새 줄로 초점을 옮긴다 */
+  function addRow(e) {
+    const trs = get().transitions.map(copyRow);
+    if (trs.length >= MAX_TRANSITIONS) return locked(tableProblemText({ why: "list" }));
+    trs.push({ from: 1, to: 1 });
+    if (apply(trs) && e && e.detail === 0) list.lastElementChild?.querySelector(".tr-st")?.focus({ preventScroll: true });
+  }
+
+  function build(r) {
+    const look = boardColors(r.states, "table");
+    const name = (i) => r.states[i]?.name ?? String(i);
+    const stBtn = (i, field, v, role) =>
+      h(
+        "button",
+        {
+          type: "button",
+          class: "tr-st",
+          "data-k": `${i}:${field}`,
+          title: t("누르면 다음 상태로 바뀌어요. Shift 를 누른 채 누르면 앞 상태로 가요."),
+          "aria-label": `${role}: ${name(v)}`,
+          onclick: (e) => cycle(i, field, e.shiftKey ? -1 : 1),
+        },
+        stateSwatch(look, v, r.states),
+        name(v),
+      );
+    rows = r.transitions.map((tr, i) => {
+      const del = h("button", { type: "button", class: "tr-del", "data-k": `${i}:del`, "aria-label": t("{n}번째 줄 지우기", { n: i + 1 }), onclick: () => removeRow(i) }, "✕");
+      const head = [stBtn(i, "from", tr.from, t("지금 상태")), h("span", { class: "tr-to", "aria-hidden": "true" }, "→"), stBtn(i, "to", tr.to, t("바뀔 상태"))];
+      if (!tr.when) {
+        const always = h(
+          "button",
+          { type: "button", class: "tr-st tr-always", "data-k": `${i}:of`, title: t("조건 없이 늘 바뀌어요. 누르면 조건을 붙여요."), onclick: () => addWhen(i) },
+          t("늘"),
+        );
+        return { li: h("li", { class: "tr" }, head, always, del), counts: null };
+      }
+      const w = tr.when;
+      const zeroLock = tr.from === 0 && tr.to !== 0 && !w.count.includes(0);
+      const counts = ALL_COUNTS.map((c) => {
+        const lock = c === 0 && zeroLock;
+        return h(
+          "button",
+          {
+            type: "button",
+            class: lock ? "count locked" : "count",
+            "data-k": `${i}:c${c}`,
+            "aria-pressed": String(w.count.includes(c)),
+            "aria-disabled": lock ? "true" : null,
+            title: lock ? LOCK_TEXT.empty() : null,
+            onclick: () => (lock ? locked(LOCK_TEXT.empty()) : toggleCount(i, c)),
+          },
+          String(c),
+        );
+      });
+      const of = stBtn(i, "of", w.state, t("셀 상태"));
+      of.title = t("누르면 다음 상태로 바뀌어요. 마지막 다음은 '늘'(조건 없음)이에요.");
+      const when = h(
+        "span",
+        { class: "tr-when" },
+        t("이웃의"),
+        " ",
+        h("span", { class: "tr-of" }, of, particle(name(w.state), "이가")),
+        h("span", { class: "counts", role: "group", "aria-label": t("이웃 수") }, counts),
+        t("개면"),
+      );
+      return { li: h("li", { class: "tr" }, head, del, when), counts };
+    });
+    // 다시 그려도 누르던 단추에 초점이 남게(키보드로 고칠 때)
+    const fk = document.activeElement?.closest?.(".trs") === list ? document.activeElement.dataset.k : null;
+    list.replaceChildren(...rows.map((x) => x.li));
+    if (fk) (list.querySelector(`[data-k="${fk}"]`) ?? list.querySelector(`[data-k^="${fk.split(":")[0]}:"]`))?.focus({ preventScroll: true });
+    add.disabled = r.transitions.length >= MAX_TRANSITIONS;
+    marked = null;
+  }
+
+  return {
+    el,
+    update: (r) => build(r),
+    /** 살펴보는 칸에 맞은 줄에 테, 조건이 있으면 그 이웃 수에도 */
+    mark(ex) {
+      const key = ex && ex.why === "row" ? `${ex.row}:${ex.counts ? JSON.stringify(ex.counts) : ""}` : null;
+      if (key === marked) return;
+      marked = key;
+      const trs = get().transitions;
+      rows.forEach((x, i) => {
+        const on = !!ex && ex.why === "row" && ex.row === i;
+        x.li.classList.toggle("why", on);
+        if (x.counts) {
+          const n = on && trs[i]?.when ? ex.counts?.[trs[i].when.state] ?? 0 : -1;
+          x.counts.forEach((b, c) => b.classList.toggle("why", c === n));
+        }
+      });
+    },
+  };
+}
+
+const table = {
+  id: "table",
+  label: () => t("조건표"),
+  batch: false,
+  zoom: 12,
+  speeds: () => speeds([["slow", 4], ["normal", 10], ["fast", 30]], (n) => t("1초에 {n}세대", { n })),
+  tools: () => [
+    { id: "pan", icon: icon(ICON.move), name: t("이동"), title: t("이동: 끌어서 둘러보기") },
+    { id: "draw", icon: icon(ICON.pen), name: t("그리기"), title: t("그리기: 끌어서 고른 상태로 칠하기") },
+    { id: "look", icon: icon(ICON.eye), name: t("살펴보기"), title: t("살펴보기: 맞는 줄과 다음 세대") },
+  ],
+  tip: {
+    pan: () => t("끌어서 둘러보고, 칸을 눌러 고른 상태로 칠하거나 비워요. 휠이나 두 손가락으로 확대·축소해요."),
+    draw: () => t("끌어서 고른 상태로 칠해요. 그 상태인 칸에서 시작하면 지워요. 둘러보려면 오른쪽 단추나 두 손가락으로 끌어요."),
+    look: () => t("칸에 커서를 올리거나 눌러 보세요. 어느 줄이 맞아 어떻게 바뀌는지 알려 줘요."),
+  },
+  /** 기록의 수는 상태 1 칸 수(와이어월드는 전자 머리)라 그 이름으로 부른다 */
+  wordsFor(get) {
+    const name = () => get().states[1]?.name ?? t("상태 1");
+    return {
+      at: (g) => t("{g}세대", { g: num(g) }),
+      value: (n) => t("{name} {n}", { name: name(), n: num(n) }),
+      aria: () => t("세대마다 {name} 칸 수", { name: name() }),
+      step: () => t("세대"),
+      count: () => name(),
+      paint: () => t("칠할 상태"),
+    };
+  },
+  canvasLabel: () => t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 고른 상태로 칠하거나 비워요"),
+  /** 만들기의 처음 규칙: 와이어월드와 같은 줄과 회로(요령 글이 와이어월드로 설명한다) */
+  blank: () => ({
+    id: "my-rule",
+    name: t("내 조건표"),
+    description: "",
+    family: "table",
+    grid: { edges: "infinite" },
+    neighborhood: "moore",
+    states: [{ name: t("빈칸") }, { name: t("전자 머리") }, { name: t("전자 꼬리") }, { name: t("도선") }],
+    transitions: WIREWORLD.map(copyRow),
+    seed: { type: "rle", data: ".BAC$C3.25C$.3C!" },
+  }),
+  withCode: (r) => r,
+  restore(rule, base) {
+    const r = copy(rule);
+    r.transitions = base.transitions.map(copyRow);
+    r.states = copy(base.states);
+    return r;
+  },
+  describe: () => t("칸마다 위에서부터 처음 맞는 줄대로 바뀌고, 맞는 줄이 없으면 그대로예요. 상태 단추를 누르면 다음 상태로 바뀌어요."),
+  codeBad: () => t("조건표는 표기가 없어요. 줄을 고치거나 규칙 파일을 불러오세요."),
+  codeOther: () => t("조건표는 표기가 없어요. 줄을 고치거나 규칙 파일을 불러오세요."),
+  states: {
+    label: () => t("상태 수"),
+    note: () => t("늘리면 줄에서 새 상태를 쓸 수 있어요. 줄이면 없어지는 상태를 쓰는 줄은 지워져요."),
+    min: 2,
+    max: MAX_TABLE_STATES,
+  },
+  /** 상태 수를 바꾼다. 없어지는 상태를 쓰는 줄은 지운다 */
+  resize(r, n) {
+    r.states = resizeStates(r.states, n, "table");
+    r.transitions = r.transitions.filter((tr) => tr.from < n && tr.to < n && (!tr.when || tr.when.state < n)).map(copyRow);
+    return r;
+  },
+  /** 칠할 상태의 처음 값: 마지막 상태(와이어월드는 도선) */
+  paintDefault: (r) => r.states.length - 1,
+  editor: (ctx) => makeTablePad(ctx),
+  hint: (world, tool) =>
+    world.count > 0 || world.bounds()
+      ? null
+      : tool === "draw"
+        ? t("칠할 상태를 고르고 끌어서 칸을 칠한 다음, 재생을 눌러 보세요.")
+        : t("칠할 상태를 고르고 칸을 눌러 칠한 다음, 재생을 눌러 보세요."),
+  tap(world, x, y, paint = 1) {
+    world.set(x, y, world.get(x, y) === paint ? 0 : paint);
+    return null;
+  },
+  strokeValue: (cur, paint = 1) => (cur === paint ? 0 : paint),
+  lookCells: (ex, [x, y]) => ex?.cells ?? around(x, y),
+  peek(ex, rule) {
+    const name = (i) => rule.states[i]?.name ?? String(i);
+    const counted = countedStates(rule.transitions);
+    const nOf = (s) => ex.counts?.[s] ?? 0;
+    return [
+      counted.length
+        ? h("div", { class: "peek-top" }, h("span", { class: "num" }, String(nOf(counted[0]))), h("span", {}, t("이웃의 {state}", { state: name(counted[0]) })))
+        : null,
+      counted.length > 1 ? h("div", {}, t("이웃의 {state} {n}개", { state: name(counted[1]), n: nOf(counted[1]) })) : null,
+      h("div", {}, t("지금 "), h("b", {}, name(ex.now)), t(", 다음 세대 "), h("b", {}, name(ex.next))),
+      h("div", {}, ex.why === "row" ? t("{n}번째 줄이 맞아요.", { n: ex.row + 1 }) : t("맞는 줄이 없어서 그대로예요.")),
+    ];
+  },
+};
+
 /** 화면이 있는 계열 */
-export const FAMILY = { life, ant, elementary };
+export const FAMILY = { life, ant, elementary, table };
 export const SCREEN_FAMILIES = Object.keys(FAMILY);

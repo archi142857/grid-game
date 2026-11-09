@@ -19,7 +19,7 @@ import { makeSpark } from "../ui/spark.js";
 import { patternArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { load, save } from "../ui/store.js";
-import { FAMILY, SCREEN_FAMILIES, LOCK_TEXT } from "../ui/families.js";
+import { FAMILY, SCREEN_FAMILIES, LOCK_TEXT, stateSwatch } from "../ui/families.js";
 import { entryOf, tagOf, MORE_RULES, MAKE_TIPS } from "../data/catalog.js";
 import { crumb } from "./common.js";
 
@@ -30,6 +30,7 @@ const MAKE_LEAD = {
   life: () => t("점을 눌러 규칙을 정하고, 칸을 그려 시작 모습을 만들어요. 마음에 들면 규칙 파일로 내려받으세요."),
   ant: () => t("글자를 눌러 칸 색마다 도는 쪽을 정하고, 개미 손으로 개미를 놓아요. 마음에 들면 규칙 파일로 내려받으세요."),
   elementary: () => t("무늬 아래 점을 눌러 규칙을 정하고, 맨 아래 줄의 칸을 켜서 시작해요. 마음에 들면 규칙 파일로 내려받으세요."),
+  table: () => t("줄의 상태 단추와 이웃 수를 눌러 규칙을 고치고, 칠할 상태를 골라 칸을 칠해요. 마음에 들면 규칙 파일로 내려받으세요."),
 };
 
 export function ruleView(main, { preset = null, params = {} } = {}) {
@@ -54,7 +55,10 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   const world = makeWorld(rule);
   const thumbs = [];
-  const words = fam.words;
+  // 낱말(세대·산 칸 …). 조건표는 상태 1 의 이름을 쓰니 지금 규칙을 보고 만든다
+  const words = fam.wordsFor ? fam.wordsFor(() => rule) : fam.words;
+  // 칠할 상태: 상태가 셋 이상일 때 고른다(이동 손으로 누르기·그리기 손이 이 상태로 칠한다)
+  let paintState = fam.paintDefault ? fam.paintDefault(rule) : 1;
 
   // ── 격자 ─────────────────
   const canvas = h("canvas", { role: "img", "aria-label": fam.canvasLabel() });
@@ -65,7 +69,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   // 전체 화면에서만 보이는 세대·산 칸
   const statGen = h("b", {}, "0");
   const statPop = h("b", {}, "0");
-  const stats = h("p", { class: "stage-stats" }, h("span", {}, words.step()), statGen, h("span", {}, words.count()), statPop);
+  const statCount = h("span", {}, words.count());
+  const stats = h("p", { class: "stage-stats" }, h("span", {}, words.step()), statGen, statCount, statPop);
   const stage = h("div", { class: "stage", dataset: { tool } }, canvas, peek, hint, stats, flash.el, zoom.el);
   const board = makeBoard(canvas, { onResize: () => ready() });
 
@@ -99,7 +104,10 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   const genNum = h("b", { class: "num" }, "0");
   const popNum = h("b", { class: "num" }, "0");
   const chgNum = h("b", { class: "num" }, "0");
+  const countLabel = h("span", {}, words.count());
   const spark = makeSpark(words);
+  const paintsBox = h("div", { class: "field", hidden: true });
+  let paintsKey = "";
 
   // ── 오른쪽: 더 보기 ─────────────────
   const statesOut = h("output", {}, "2");
@@ -137,6 +145,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       { class: "side-sec", "aria-labelledby": "rule-t" },
       h("div", { class: "side-head" }, h("h2", { id: "rule-t" }, t("규칙")), restoreBtn),
       editor.el,
+      paintsBox,
       say,
     ),
     h(
@@ -146,7 +155,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
         "div",
         { class: "readouts" },
         h("div", { class: "readout" }, h("span", {}, words.step()), genNum),
-        h("div", { class: "readout" }, h("span", {}, words.count()), popNum),
+        h("div", { class: "readout" }, countLabel, popNum),
         h("div", { class: "readout" }, h("span", {}, words.changed ? words.changed() : t("바뀐 칸")), chgNum),
       ),
       spark.el,
@@ -448,13 +457,13 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
         paint();
         return;
       }
-      const note = tool === "ant" ? fam.placeAgent(world, x, y) : fam.tap(world, x, y);
+      const note = tool === "ant" ? fam.placeAgent(world, x, y) : fam.tap(world, x, y, paintState);
       if (note) flash.show(note, 2400);
       world.touched();
       paint();
     },
     onStroke([x, y]) {
-      const v = fam.strokeValue(world.get(x, y));
+      const v = fam.strokeValue(world.get(x, y), paintState);
       const put = ([cx, cy]) => {
         world.set(cx, cy, v);
         paint();
@@ -506,8 +515,38 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     say.textContent = fam.describe(rule);
     restoreBtn.hidden = !edited;
     statesOut.textContent = String(rule.states.length);
+    countLabel.textContent = statCount.textContent = words.count();
+    syncPaints();
     if (make) setTitle(code ? t("{code} 만들기", { code }) : t("새 규칙"));
     syncUrl(code);
+  }
+
+  /** 칠할 상태 고르기: 상태가 셋 이상일 때만. 상태가 바뀌면 다시 만든다 */
+  function syncPaints() {
+    const n = rule.states.length;
+    if (paintState >= n) paintState = n - 1;
+    const show = n >= 3;
+    paintsBox.hidden = !show;
+    if (!show) {
+      paintState = 1;
+      paintsKey = "";
+      paintsBox.replaceChildren();
+      return;
+    }
+    const key = JSON.stringify(rule.states);
+    if (key === paintsKey) return;
+    paintsKey = key;
+    const look = boardColors(rule.states, rule.family);
+    const label = words.paint ? words.paint() : t("칠할 상태");
+    const seg = segmented({
+      label,
+      cls: "paints",
+      item: "paint",
+      value: paintState,
+      options: rule.states.map((st, i) => ({ id: i, name: st.name, icon: stateSwatch(look, i, rule.states) })),
+      onChange: (id) => (paintState = id),
+    });
+    paintsBox.replaceChildren(h("span", { class: "field-label" }, label), seg.el);
   }
 
   /** 고친 규칙을 주소에 남긴다(그대로 나눌 수 있게). hashchange 는 일으키지 않는다 */
@@ -542,8 +581,14 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     if (!fam.states) return;
     n = Math.min(fam.states.max, Math.max(fam.states.min, n));
     if (n === rule.states.length) return;
-    const r = copy(rule);
-    r.states = resizeStates(r.states, n, fam.id);
+    let r = copy(rule);
+    if (fam.resize) r = fam.resize(r, n);
+    else r.states = resizeStates(r.states, n, fam.id);
+    const why = lockOf(r);
+    if (why) {
+      say.textContent = (LOCK_TEXT[why] ?? LOCK_TEXT.birth0)();
+      return;
+    }
     setRule(r);
   }
 
@@ -611,7 +656,8 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     let art;
     let label;
     if (x.kind === "pattern") {
-      art = patternArt(parseRLE(x.rle).rows);
+      // 여러 상태 무늬(조건표)는 판과 같은 점 크기로
+      art = patternArt(parseRLE(x.rle).rows, rule.family === "life" ? {} : { look: boardColors(rule.states, rule.family) });
       label = t("놓아 보기");
     } else if (x.kind === "rule") {
       const p = parseCode(x.notation);
@@ -732,7 +778,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 }
 
 /** 계열마다 만들기 화면의 '다른 규칙 써 보기'를 가져올 도감 규칙 */
-const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"], elementary: ["rule-30", "rule-90", "rule-110"] };
+const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"], elementary: ["rule-30", "rule-90", "rule-110"], table: ["wireworld"] };
 
 function uniqueBy(list, key) {
   const seen = new Set();
