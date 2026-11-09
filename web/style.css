@@ -391,6 +391,13 @@ main {
   font-size: 1rem;
   color: var(--ink-3);
 }
+/* PC 의 옆 판(340px)에서는 숫자 점 아홉이 이름 옆에 서면 동그라미가 못 되고 타원이 된다. 폰처럼 이름을 위로 */
+@media (min-width: 1025px) {
+  .side .pad > .pad-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
 .counts {
   display: flex;
   gap: 6px;
@@ -1695,7 +1702,8 @@ html.has-full body {
 }
 
 /* 조건표 줄: [지금 상태] → [다음 상태], 그 아래 조건(이웃의 [상태]가 [0–8]개면) 또는 '늘'.
-   조건의 상태 단추와 조사는 .tr-of 로 묶어 붙인다 */
+   조건의 상태 단추와 조사는 .tr-of 로 묶어 붙인다. 지우기 ✕ 는 늘 오른쪽 위 구석에 있고,
+   줄의 오른쪽 안쪽 여백이 그 자리다(이름이 길면 머리 줄이 ✕ 앞에서 접힌다) */
 .trs {
   list-style: none;
   margin: 0;
@@ -1704,11 +1712,12 @@ html.has-full body {
   gap: 8px;
 }
 .tr {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 10px;
+  gap: 8px 6px;
+  padding: 10px 40px 10px 10px;
   border-radius: var(--r-m);
   background: var(--board);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -1719,16 +1728,16 @@ html.has-full body {
 .tr-st {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   height: 32px;
-  padding: 0 12px 0 8px;
+  padding: 0 11px 0 7px;
   border: 0;
   border-radius: 999px;
   background: var(--raise);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink);
   font-weight: 650;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 .tr-st:hover {
@@ -1738,11 +1747,37 @@ html.has-full body {
 .tr-always {
   color: var(--ink-3);
 }
+.tr-to {
+  margin: 0 -2px;
+}
 .tr-always {
   font-size: 0.8125rem;
 }
+/* '늘'이 단추일 때(누르면 조건이 붙는다): 알약 대신 가벼운 글자 단추 */
+.tr-st.tr-always {
+  height: 28px;
+  padding: 0 4px;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-3);
+  font-weight: 600;
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+}
+.tr-st.tr-always:hover {
+  box-shadow: none;
+  color: var(--ink);
+}
+/* 살펴보기에서 맞은 줄: 숫자 점의 .why 와 같은 분홍 테 */
+.tr.why {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 0 0 2px var(--board),
+    0 0 0 4px var(--signal);
+}
 .tr-when {
-  flex-basis: 100%;
+  flex-basis: calc(100% + 30px);
+  margin-right: -30px; /* 조건 줄은 ✕ 자리 밑까지 넓게 */
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1753,18 +1788,25 @@ html.has-full body {
   align-items: center;
   gap: 3px;
 }
+/* 이웃 수 점 아홉은 '개면'과 한 줄에 서도록 조금씩 줄어든다(25px 까지) */
 .tr-when .counts {
-  flex-wrap: wrap;
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 249px;
+  flex-wrap: nowrap;
   gap: 3px;
 }
 .tr-when .count {
-  flex: none;
-  width: 25px;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
   max-width: 25px;
   font-size: 0.75rem;
 }
 .tr-del {
-  margin-left: auto;
+  position: absolute;
+  top: 11px; /* 첫 줄(32px 알약)의 가운데 */
+  right: 6px;
   width: 30px;
   height: 30px;
   border: 0;
@@ -1810,8 +1852,9 @@ html.has-full body {
   box-shadow: inset 0 0 0 2px var(--ink);
 }
 
-/* 개미 편집기 묶음: 회전 글자 줄(.turns), 색 빼기·더하기(.file-row), 터마이트 표(.machine-wrap) */
-.ant-pad {
+/* 편집기 묶음: 개미(.turns · 색 빼기·더하기 · 터마이트 표), 조건표(ol.trs · 줄 더하기) */
+.ant-pad,
+.table-pad {
   display: grid;
   gap: 14px;
 }
@@ -2094,5 +2137,14 @@ html.has-full body {
   .paint[aria-checked="true"] {
     background: Highlight;
     color: HighlightText;
+  }
+  .tr-st.tr-always {
+    border: 0;
+  }
+  /* 살펴보기의 분홍 테(그림자)는 고대비에서 사라지니 윤곽선으로 */
+  .tr.why,
+  .count.why {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
   }
 }
