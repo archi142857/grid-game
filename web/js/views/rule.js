@@ -34,6 +34,7 @@ const MAKE_LEAD = {
   ant: () => t("글자를 눌러 칸 색마다 도는 쪽을 정하고, 개미 손으로 개미를 놓아요. 마음에 들면 규칙 파일로 내려받으세요."),
   elementary: () => t("무늬 아래 점을 눌러 규칙을 정하고, 맨 아래 줄의 칸을 켜서 시작해요. 마음에 들면 규칙 파일로 내려받으세요."),
   table: () => t("줄의 상태 단추와 이웃 수를 눌러 규칙을 고치고, 칠할 상태를 골라 칸을 칠해요. 마음에 들면 규칙 파일로 내려받으세요."),
+  cyclic: () => t("색 수와 문턱, 이웃을 골라 규칙을 정하고 돌려요. 무작위로 칠한 판이 소용돌이로 정리돼요. 마음에 들면 규칙 파일로 내려받으세요."),
 };
 
 /** mine: 내 규칙(#/mine/<key>)으로 열었으면 그 열쇠. preset 은 담아 둔 규칙 */
@@ -449,11 +450,11 @@ export function ruleView(main, { preset = null, params = {}, mine = null } = {})
   function ready() {
     if (!seeded && board.ready) {
       seeded = true;
-      const z = canvas.clientWidth < 560 ? 8 : fam.zoom;
+      const z = canvas.clientWidth < 560 ? (fam.phoneZoom ?? 8) : fam.zoom;
       board.setView({ cx: 0, cy: 0, z });
       // 1차원: 0세대 줄이 화면 위에서 15% 쯤에 오게
       if (fam.top) board.setView({ cx: 0, cy: board.span().h * 0.35, z });
-      world.reseed(world.seed, viewRegion(0.7));
+      world.reseed(world.seed, viewRegion(fam.seedArea ?? 0.7));
     }
     zoom.update(board.canZoom());
     render(loop.progress());
@@ -564,7 +565,7 @@ export function ruleView(main, { preset = null, params = {}, mine = null } = {})
     rule = r;
     world.setRule(r);
     if (reseed) {
-      world.reseed(randomSeed(), viewRegion(0.7));
+      world.reseed(randomSeed(), viewRegion(fam.seedArea ?? 0.7));
       look = null;
       follow = !!fam.follow;
     }
@@ -773,7 +774,7 @@ export function ruleView(main, { preset = null, params = {}, mine = null } = {})
 
   function scatter() {
     const s = rule.seed;
-    world.scatter(s.type === "random" ? s.density : 0.3, randomSeed(), viewRegion(0.7));
+    world.scatter(s.type === "random" ? s.density : 0.3, randomSeed(), viewRegion(fam.seedArea ?? 0.7));
     look = null;
     follow = !!fam.follow;
     flash.hide();
@@ -966,7 +967,7 @@ export function ruleView(main, { preset = null, params = {}, mine = null } = {})
 }
 
 /** 계열마다 만들기 화면의 '다른 규칙 써 보기'를 가져올 도감 규칙 */
-const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"], elementary: ["rule-30", "rule-90", "rule-110"], table: ["wireworld"] };
+const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"], elementary: ["rule-30", "rule-90", "rule-110"], table: ["wireworld"], cyclic: ["cyclic-14"] };
 
 function uniqueBy(list, key) {
   const seen = new Set();

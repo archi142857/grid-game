@@ -163,6 +163,10 @@ export function makeWorld(rule, { seed = randomSeed(), keep = 600 } = {}) {
     get count() {
       return S.alive;
     },
+    /** 판 전체의 빈칸 아닌 칸 수(0 이면 빈 판. 개미는 칸만 센다) */
+    get filled() {
+      return S.filled;
+    },
     /** 쓰고 있는 조각 수(넓게 퍼질수록 커진다) */
     get size() {
       return S.size;

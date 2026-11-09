@@ -36,6 +36,7 @@ const THUMB_GENS = {
   "rule-90": 63,
   "rule-110": 56,
   wireworld: 20,
+  "cyclic-14": 420,
 };
 
 export function homeView(main, { presets }) {
@@ -502,6 +503,7 @@ const GROUPS = [
   { id: "ant", name: () => t("개미"), note: () => t("칸 위를 걷는 개미가 색을 바꿔요") },
   { id: "elementary", name: () => t("1차원"), note: () => t("한 줄이 세대마다 아래로 쌓여요") },
   { id: "table", name: () => t("조건표"), note: () => t("상태마다 바뀔 조건을 적어요") },
+  { id: "cyclic", name: () => t("순환"), note: () => t("색이 고리를 돌며 소용돌이를 만들어요") },
 ];
 
 function makeShelf(presets) {
@@ -579,7 +581,8 @@ function makeShelf(presets) {
       h("p", {}, t("이름난 규칙 {n}가지를 모았어요. 그림을 누르면 크게 돌려 볼 수 있어요.", { n: presets.length })),
     ),
     groups,
-    h("p", { class: "soon" }, t("다음에 들어올 규칙: {list}", { list: SOON().join(", ") })),
+    // 다음에 들어올 규칙: 목록이 비면 줄을 숨긴다
+    SOON().length ? h("p", { class: "soon" }, t("다음에 들어올 규칙: {list}", { list: SOON().join(", ") })) : null,
   );
   return {
     el,

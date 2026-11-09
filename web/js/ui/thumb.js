@@ -66,7 +66,8 @@ function makeLifeThumb(rule, { w = 26, h: hh = 26, gens = 30, key = rule.id, rat
 }
 
 /** 계열마다 그림의 처음 걸음 수와 빠르기(1초에). 개미는 한 장면에 몰아 넘긴다 */
-const SIM_THUMB = { ant: { gens: 6000, rate: 600, batch: true }, elementary: { gens: 48, rate: 16 }, table: { gens: 0, rate: 8 } };
+// size: 처음 칠할 네모 한 변(순환은 넓어야 소용돌이가 나온다)
+const SIM_THUMB = { ant: { gens: 6000, rate: 600, batch: true }, elementary: { gens: 48, rate: 16 }, table: { gens: 0, rate: 8 }, cyclic: { gens: 420, rate: 20, size: 72 } };
 
 function makeSimThumb(rule, { gens, key = rule.id, rate } = {}) {
   const d = SIM_THUMB[rule.family] ?? { gens: 30, rate: 8 };
@@ -74,7 +75,7 @@ function makeSimThumb(rule, { gens, key = rule.id, rate } = {}) {
   const speed = rate ?? d.rate;
   const canvas = h("canvas", { "aria-hidden": "true" });
   const world = makeWorld(rule, { keep: 2 });
-  const region = regionAt(0, 0, 24, 24);
+  const region = regionAt(0, 0, d.size ?? 24, d.size ?? 24);
   let seed = seedOf(key);
   const reset = (n) => {
     seed = n >>> 0;

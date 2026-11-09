@@ -8,7 +8,8 @@ import { t, num, lang } from "../i18n.js";
 import { josa } from "../core/josa.js";
 import { MAX_STATES } from "../core/life.js";
 import { resizeStates } from "../core/rules.js";
-import { around, MAX_ANT_COLORS, MAX_AGENTS, MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED } from "../core/sim.js";
+import { around, MAX_ANT_COLORS, MAX_AGENTS, MAX_TABLE_STATES, MAX_TRANSITIONS, MAX_COUNTED, MAX_CYCLIC_STATES, CYCLIC_THRESHOLD } from "../core/sim.js";
+import { segmented } from "./widgets.js";
 import { tableProblem, countedStates, WIREWORLD } from "../core/table.js";
 import { makeRulePad, describeRule, blockedReason } from "./rulepad.js";
 import { boardColors } from "./theme.js";
@@ -763,7 +764,7 @@ const table = {
   paintDefault: (r) => r.states.length - 1,
   editor: (ctx) => makeTablePad(ctx),
   hint: (world, tool) =>
-    world.count > 0 || world.bounds()
+    world.filled > 0
       ? null
       : tool === "draw"
         ? t("칠할 상태를 고르고 끌어서 칸을 칠한 다음, 재생을 눌러 보세요.")
@@ -789,6 +790,176 @@ const table = {
   },
 };
 
+// ── 순환 ─────────────────
+
+/** −·+ 단추와 수(.stepper, 더 보기의 상태 수와 같은 꼴) */
+function stepper(label, out, minus, plus, onMinus, onPlus) {
+  const dec = h("button", { class: "btn small square", type: "button", "aria-label": minus, onclick: onMinus }, icon(ICON.minus));
+  const inc = h("button", { class: "btn small square", type: "button", "aria-label": plus, onclick: onPlus }, icon(ICON.plus));
+  return { el: h("div", { class: "stepper", role: "group", "aria-label": label }, dec, out, inc), dec, inc };
+}
+
+/**
+ * 순환 편집기: 색 고리(색마다 견본을 도는 차례로), 색 수(바탕 빼고 2–24), 문턱(1–이웃 수), 이웃(4칸 · 8칸).
+ * 모양은 디자인 시안이 오기 전까지 더 보기(.more-body·.field·.stepper)와 계열 고르기(segmented)를 빌려 쓴다
+ */
+function makeCyclicPad({ get, set }) {
+  const MAX_COLORS = MAX_CYCLIC_STATES - 1;
+  const colorsOut = h("output", {}, "");
+  const thrOut = h("output", {}, "");
+  const colorsOf = () => get().states.length - 1;
+  const setColors = (n) => {
+    n = Math.max(2, Math.min(MAX_COLORS, n));
+    if (n === colorsOf()) return;
+    const r = copy(get());
+    r.states = resizeStates(r.states, n + 1, "cyclic");
+    set(r);
+  };
+  const setThr = (v) => {
+    const r = copy(get());
+    v = Math.max(1, Math.min(CYCLIC_THRESHOLD[r.neighborhood] ?? 8, v));
+    if (v === r.threshold) return;
+    r.threshold = v;
+    set(r);
+  };
+  const setNb = (id) => {
+    const r = copy(get());
+    if (r.neighborhood === id) return;
+    r.neighborhood = id;
+    r.threshold = Math.min(r.threshold, CYCLIC_THRESHOLD[id]);
+    set(r);
+  };
+  const colors = stepper(t("색 수"), colorsOut, t("색 하나 빼기"), t("색 하나 더하기"), () => setColors(colorsOf() - 1), () => setColors(colorsOf() + 1));
+  const thr = stepper(t("문턱"), thrOut, t("문턱 낮추기"), t("문턱 높이기"), () => setThr(get().threshold - 1), () => setThr(get().threshold + 1));
+  const nb = segmented({
+    label: t("이웃"),
+    value: get().neighborhood,
+    options: [
+      { id: "von-neumann", name: t("4칸"), title: t("폰 노이만 이웃: 위·아래·왼쪽·오른쪽 4칸") },
+      { id: "moore", name: t("8칸"), title: t("무어 이웃: 둘레 8칸") },
+    ],
+    onChange: (id) => setNb(id),
+  });
+  const ring = h("div", { class: "cyc-ring", role: "img" });
+  const field = (label, control) => h("div", { class: "field" }, h("span", { class: "field-label" }, label), control);
+  const el = h("div", { class: "more-body cyc-pad" }, ring, field(t("색 수"), colors.el), field(t("문턱"), thr.el), field(t("이웃"), nb.el));
+  let ringKey = "";
+  let dots = [];
+  return {
+    el,
+    update(r) {
+      const n = r.states.length - 1;
+      const max = CYCLIC_THRESHOLD[r.neighborhood] ?? 8;
+      colorsOut.textContent = String(n);
+      thrOut.textContent = String(r.threshold);
+      colors.dec.disabled = n <= 2;
+      colors.inc.disabled = n >= MAX_COLORS;
+      thr.dec.disabled = r.threshold <= 1;
+      thr.inc.disabled = r.threshold >= max;
+      nb.set(r.neighborhood);
+      const key = JSON.stringify(r.states);
+      if (key !== ringKey) {
+        ringKey = key;
+        const look = boardColors(r.states, "cyclic");
+        dots = r.states.slice(1).map((_, i) => stateSwatch(look, i + 1, r.states));
+        ring.replaceChildren(...dots);
+        ring.setAttribute("aria-label", t("색 고리: 색 {n}가지가 차례로 돌고, 마지막 다음은 다시 색 1", { n }));
+      }
+    },
+    /** 살펴보는 칸이 넘어갈 다음 색의 견본에 테 */
+    mark(ex) {
+      dots.forEach((d, i) => d.classList.toggle("why", !!ex && ex.target === i + 1));
+    },
+  };
+}
+
+const cyclic = {
+  id: "cyclic",
+  label: () => t("순환"),
+  batch: false,
+  zoom: 3, // 소용돌이는 판이 150칸은 넘어야 나와서 작은 칸으로 넓게 본다
+  phoneZoom: 2,
+  seedArea: 0.92, // 보이는 넓이의 이만큼을 칠한다(넓을수록 소용돌이가 잘 나온다)
+  speeds: () => speeds([["slow", 10], ["normal", 30], ["fast", 60]], (n) => t("1초에 {n}세대", { n })),
+  tools: () => [
+    { id: "pan", icon: icon(ICON.move), name: t("이동"), title: t("이동: 끌어서 둘러보기") },
+    { id: "draw", icon: icon(ICON.pen), name: t("그리기"), title: t("그리기: 끌어서 고른 색으로 칠하기") },
+    { id: "look", icon: icon(ICON.eye), name: t("살펴보기"), title: t("살펴보기: 다음 색 이웃과 문턱") },
+  ],
+  tip: {
+    pan: () => t("끌어서 둘러보고, 칸을 눌러 고른 색으로 칠하거나 바탕으로 비워요. 휠이나 두 손가락으로 확대·축소해요."),
+    draw: () => t("끌어서 고른 색으로 칠해요. 그 색인 칸에서 시작하면 바탕으로 지워요. 둘러보려면 오른쪽 단추나 두 손가락으로 끌어요."),
+    look: () => t("칸에 커서를 올리거나 눌러 보세요. 바로 다음 색인 이웃을 세어 넘어가는지 알려 줘요."),
+  },
+  words: {
+    at: (g) => t("{g}세대", { g: num(g) }),
+    value: (n) => t("바뀐 칸 {n}", { n: num(n) }),
+    aria: () => t("세대마다 색이 바뀐 칸 수"),
+    step: () => t("세대"),
+    // 순환은 바탕 아닌 칸 수가 늘 같아서 기록의 수는 한 세대에 색이 바뀐 칸 수다(셋째 칸은 색 수)
+    count: () => t("바뀐 칸"),
+    changed: () => t("색"),
+    paint: () => t("칠할 색"),
+  },
+  changed: (world) => world.rule.states.length - 1,
+  canvasLabel: () => t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 고른 색으로 칠하거나 비워요"),
+  blank: () => ({
+    id: "my-rule",
+    name: t("내 순환 규칙"),
+    description: "",
+    family: "cyclic",
+    grid: { edges: "infinite" },
+    neighborhood: "von-neumann",
+    states: resizeStates([], 15, "cyclic"),
+    threshold: 1,
+    seed: { type: "random", density: 1 },
+  }),
+  withCode: (r) => r,
+  restore(rule, base) {
+    const r = copy(rule);
+    r.threshold = base.threshold;
+    r.neighborhood = base.neighborhood;
+    r.states = copy(base.states);
+    return r;
+  },
+  describe: (r) =>
+    t("색 {n}가지가 고리를 돌아요. 이웃 가운데 바로 다음 색인 칸이 {k}개 이상이면 그 색으로 넘어가요. 바탕은 바뀌지 않아요.", {
+      n: r.states.length - 1,
+      k: r.threshold,
+    }),
+  codeBad: () => t("순환은 표기가 없어요. 색 수·문턱·이웃을 눌러 고쳐요."),
+  codeOther: () => t("순환은 표기가 없어요. 색 수·문턱·이웃을 눌러 고쳐요."),
+  states: null, // 색 수는 편집기에서
+  editor: (ctx) => makeCyclicPad(ctx),
+  hint: (world, tool) =>
+    world.filled > 0
+      ? null
+      : tool === "draw"
+        ? t("끌어서 칠하거나, 흩뿌리기로 판을 고르게 칠한 다음 재생을 눌러 보세요.")
+        : t("흩뿌리기를 누르면 판을 색으로 고르게 칠해요. 그다음 재생을 눌러 보세요."),
+  tap(world, x, y, paint = 1) {
+    world.set(x, y, world.get(x, y) === paint ? 0 : paint);
+    return null;
+  },
+  strokeValue: (cur, paint = 1) => (cur === paint ? 0 : paint),
+  lookCells: (ex, [x, y]) => ex?.cells ?? around(x, y),
+  peek(ex, rule) {
+    const name = (i) => rule.states[i]?.name ?? String(i);
+    if (ex.why === "base") return [h("div", {}, t("지금 "), h("b", {}, name(0))), h("div", {}, t("바탕은 바뀌지 않아요."))];
+    return [
+      h("div", { class: "peek-top" }, h("span", { class: "num" }, String(ex.n)), h("span", {}, t("다음 색 이웃"))),
+      h("div", {}, t("지금 "), h("b", {}, name(ex.now)), t(", 다음 세대 "), h("b", {}, name(ex.next))),
+      h(
+        "div",
+        {},
+        ex.why === "turn"
+          ? t("다음 색({target}) 이웃이 문턱 {k}에 닿아서 넘어가요.", { target: name(ex.target), k: ex.threshold })
+          : t("다음 색({target}) 이웃이 문턱 {k}보다 적어서 그대로예요.", { target: name(ex.target), k: ex.threshold }),
+      ),
+    ];
+  },
+};
+
 /** 화면이 있는 계열 */
-export const FAMILY = { life, ant, elementary, table };
+export const FAMILY = { life, ant, elementary, table, cyclic };
 export const SCREEN_FAMILIES = Object.keys(FAMILY);
