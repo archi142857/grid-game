@@ -8,11 +8,18 @@ import { t, num } from "../i18n.js";
 import { MAX_STATES } from "../core/life.js";
 import { resizeStates } from "../core/rules.js";
 import { around, MAX_ANT_COLORS, MAX_AGENTS } from "../core/sim.js";
-import { makeRulePad, describeRule } from "./rulepad.js";
+import { makeRulePad, describeRule, blockedReason } from "./rulepad.js";
 import { boardColors } from "./theme.js";
 import { LIFE_WORDS } from "./spark.js";
 
 const copy = (o) => structuredClone(o);
+
+/** 끝없는 격자에서 돌릴 수 없는 까닭(core/rules.js 의 lockOf 낱말) → 화면 글 */
+export const LOCK_TEXT = {
+  birth0: () => blockedReason({ birth: [0] }),
+  odd: () => t("끝없는 격자에서는 홀수 번호를 쓸 수 없어요. 000 이 켜지면 빈 곳이 끝없이 한꺼번에 켜지거든요."),
+  empty: () => t("끝없는 격자에서는 이웃이 없는 빈칸이 바뀌는 줄을 쓸 수 없어요. 빈 곳이 끝없이 한꺼번에 바뀌거든요."),
+};
 
 const SPEED_NAME = { slow: () => t("느리게"), normal: () => t("보통"), fast: () => t("빠르게") };
 /** [[id, 1초에 몇 번]] → 빠르기 고르기 단추 */
@@ -334,6 +341,137 @@ const ant = {
   },
 };
 
+// ── 1차원 기본 ─────────────────
+
+const PAT_ORDER = [7, 6, 5, 4, 3, 2, 1, 0]; // 111 부터 000 까지
+const bitsOf = (p) => [(p >> 2) & 1, (p >> 1) & 1, p & 1];
+const bitsText = (p) => bitsOf(p).join("");
+
+/**
+ * 무늬 8개 편집기(사용자가 고른 시안 A): 위에 이웃 세 칸, 아래에 결과 점. 점을 누르면 그 무늬의 결과가 바뀌고 번호가 따라간다.
+ * 000 이 켜지는 규칙(홀수)은 끝없는 격자에서 못 돌려서 000 의 점은 잠가 둔다
+ */
+function makePatPad({ get, set, locked }) {
+  const pats = h("div", { class: "pats", role: "group" });
+  const items = PAT_ORDER.map((p) => {
+    const lock = p === 0;
+    const btn = h("button", {
+      type: "button",
+      class: lock ? "count locked" : "count",
+      "aria-pressed": "false",
+      "aria-disabled": lock ? "true" : null,
+      title: lock ? LOCK_TEXT.odd() : null,
+      onclick: () => {
+        if (lock) return locked && locked(LOCK_TEXT.odd());
+        const r = copy(get());
+        r.number ^= 1 << p;
+        set(r);
+      },
+    });
+    const el = h(
+      "div",
+      { class: "pat" },
+      h(
+        "span",
+        { class: "pat-in", "aria-hidden": "true" },
+        bitsOf(p).map((b) => h("i", { class: b ? "on" : null })),
+      ),
+      btn,
+    );
+    return { p, el, btn };
+  });
+  pats.append(...items.map((x) => x.el));
+  return {
+    el: pats,
+    update(r) {
+      pats.setAttribute("aria-label", t("무늬 8개 (규칙 {n})", { n: r.number }));
+      for (const { p, btn } of items) {
+        const on = ((r.number >> p) & 1) === 1;
+        btn.setAttribute("aria-pressed", String(on));
+        const say = t("{p} 다음은 {v}", { p: bitsText(p), v: on ? t("켜짐") : t("꺼짐") });
+        btn.setAttribute("aria-label", p === 0 ? `${say}. ${LOCK_TEXT.odd()}` : say);
+      }
+    },
+    /** 살펴보는 칸을 정한 윗줄 무늬에 테 */
+    mark(ex) {
+      for (const { p, btn } of items) btn.classList.toggle("why", !!ex && ex.pattern === p);
+    },
+  };
+}
+
+const elementary = {
+  id: "elementary",
+  label: () => t("1차원"),
+  batch: false,
+  zoom: 8,
+  follow: true, // 보는 곳이 새 줄을 따라 내려간다(손으로 끌면 멈춘다)
+  top: true, // 0세대 줄을 화면 위쪽에 두고 시작
+  speeds: () => speeds([["slow", 8], ["normal", 30], ["fast", 120]], (n) => t("1초에 {n}세대", { n })),
+  tools: () => [
+    { id: "pan", icon: icon(ICON.move), name: t("이동"), title: t("이동: 끌어서 둘러보기") },
+    { id: "draw", icon: icon(ICON.pen), name: t("그리기"), title: t("그리기: 지금 줄을 따라 끌어서 칸 켜기") },
+    { id: "look", icon: icon(ICON.eye), name: t("살펴보기"), title: t("살펴보기: 윗줄 세 칸과 그 결과") },
+  ],
+  tip: {
+    pan: () => t("끌어서 둘러보고, 맨 아래 지금 줄의 칸을 눌러 켜거나 꺼요. 휠이나 두 손가락으로 확대·축소해요."),
+    draw: () => t("지금 줄을 따라 끌어서 칸을 켜요. 켜진 칸에서 시작하면 꺼요. 둘러보려면 오른쪽 단추나 두 손가락으로 끌어요."),
+    look: () => t("칸에 커서를 올리거나 눌러 보세요. 윗줄 세 칸의 무늬로 어떻게 정해졌는지 알려 줘요."),
+  },
+  words: {
+    at: (g) => t("{g}세대", { g: num(g) }),
+    value: (n) => t("켜진 칸 {n}", { n: num(n) }),
+    aria: () => t("세대마다 지금 줄의 켜진 칸 수"),
+    step: () => t("세대"),
+    count: () => t("켜진 칸"),
+  },
+  canvasLabel: () => t("끝없는 격자. 세대가 아래로 쌓여요. 끌면 둘러보고, 맨 아래 줄의 칸을 누르면 켜거나 꺼요"),
+  blank: () => ({
+    id: "my-rule",
+    name: t("내 1차원 규칙"),
+    description: "",
+    family: "elementary",
+    grid: { edges: "infinite" },
+    states: [{ name: t("빈칸") }, { name: t("켜진 칸") }],
+    number: 30,
+    seed: { type: "single" },
+  }),
+  withCode(r, p) {
+    r.number = p.number;
+    return r;
+  },
+  restore(rule, base) {
+    const r = copy(rule);
+    r.number = base.number;
+    return r;
+  },
+  describe: () => t("위 세 칸이 이 무늬면 다음 줄 가운데 칸이 켜져요. 아래 점을 눌러 바꿔요."),
+  codeBad: () => t("읽을 수 없는 표기예요. 예: W30, W90, W110 (0–255 의 짝수)"),
+  codeOther: () => t("이 화면에서는 W30 같은 1차원 표기를 써요."),
+  states: null,
+  editor: (ctx) => makePatPad(ctx),
+  hint: (world, tool) =>
+    world.count > 0 ? null : tool === "draw" ? t("맨 아래 줄을 따라 끌어 칸을 켠 다음, 재생을 눌러 보세요.") : t("맨 아래 줄의 칸을 눌러 켠 다음, 재생을 눌러 보세요."),
+  /** 지금 줄(맨 아래)의 칸만 켜고 끈다. 다른 줄이면 알릴 글 */
+  tap(world, x, y) {
+    if (y !== world.head) return t("맨 아래 지금 줄에서만 칸을 바꿀 수 있어요.");
+    world.set(x, y, world.get(x, y) === 1 ? 0 : 1);
+    return null;
+  },
+  strokeValue: (cur) => (cur === 1 ? 0 : 1),
+  lookCells: (ex) => ex.cells,
+  peek(ex, rule) {
+    const name = (i) => rule.states[i]?.name ?? String(i);
+    if (ex.why === "start") return [h("div", {}, t("지금 "), h("b", {}, name(ex.now))), h("div", {}, t("0세대 줄이에요. 여기서 시작해 아래로 쌓여요."))];
+    if (ex.why === "none") return [h("div", {}, t("아직 만들지 않았거나 지운 줄이에요."))];
+    const bits = bitsText(ex.pattern);
+    return [
+      h("div", { class: "peek-top" }, h("span", { class: "num" }, bits), h("span", {}, t("윗줄 세 칸"))),
+      ex.why === "next" ? h("div", {}, t("다음 세대에 생길 칸이에요.")) : h("div", {}, t("지금 "), h("b", {}, name(ex.now))),
+      h("div", {}, t("윗줄이 {bits} 이면 {state:이가} 돼요.", { bits, state: name(ex.next) }), ex.why === "rule" && ex.now !== ex.next ? t(" 이 칸은 손으로 바꿨어요.") : null),
+    ];
+  },
+};
+
 /** 화면이 있는 계열 */
-export const FAMILY = { life, ant };
+export const FAMILY = { life, ant, elementary };
 export const SCREEN_FAMILIES = Object.keys(FAMILY);

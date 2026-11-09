@@ -30,6 +30,9 @@ const THUMB_GENS = {
   "ant-llrr": 8000,
   "ant-lrrrrrllr": 16000,
   "fibonacci-turmite": 3000,
+  "rule-30": 40,
+  "rule-90": 63,
+  "rule-110": 56,
 };
 
 export function homeView(main, { presets }) {

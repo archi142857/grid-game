@@ -13,29 +13,23 @@ import { makeBoard } from "../ui/board.js";
 import { makeLoop, makePainter } from "../ui/loop.js";
 import { attachNav } from "../ui/nav.js";
 import { boardColors } from "../ui/theme.js";
-import { makeNotationField, blockedReason } from "../ui/rulepad.js";
+import { makeNotationField } from "../ui/rulepad.js";
 import { segmented, paragraphs, zoomControls, flashLine, makeCapsule, makeFullscreen } from "../ui/widgets.js";
 import { makeSpark } from "../ui/spark.js";
 import { patternArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { load, save } from "../ui/store.js";
-import { FAMILY, SCREEN_FAMILIES } from "../ui/families.js";
+import { FAMILY, SCREEN_FAMILIES, LOCK_TEXT } from "../ui/families.js";
 import { entryOf, tagOf, MORE_RULES, MAKE_TIPS } from "../data/catalog.js";
 import { crumb } from "./common.js";
 
 const copy = (o) => structuredClone(o);
 
-/** 끝없는 격자에서 돌릴 수 없는 까닭(core/rules.js 의 lockOf 낱말) → 화면 글 */
-const LOCK_TEXT = {
-  birth0: () => blockedReason({ birth: [0] }),
-  odd: () => t("끝없는 격자에서는 홀수 번호를 쓸 수 없어요. 000 이 켜지면 빈 곳이 끝없이 한꺼번에 켜지거든요."),
-  empty: () => t("끝없는 격자에서는 이웃이 없는 빈칸이 바뀌는 줄을 쓸 수 없어요. 빈 곳이 끝없이 한꺼번에 바뀌거든요."),
-};
-
 /** 계열마다 만들기 화면의 처음 글 */
 const MAKE_LEAD = {
   life: () => t("점을 눌러 규칙을 정하고, 칸을 그려 시작 모습을 만들어요. 마음에 들면 규칙 파일로 내려받으세요."),
   ant: () => t("글자를 눌러 칸 색마다 도는 쪽을 정하고, 개미 손으로 개미를 놓아요. 마음에 들면 규칙 파일로 내려받으세요."),
+  elementary: () => t("무늬 아래 점을 눌러 규칙을 정하고, 맨 아래 줄의 칸을 켜서 시작해요. 마음에 들면 규칙 파일로 내려받으세요."),
 };
 
 export function ruleView(main, { preset = null, params = {} } = {}) {
@@ -56,6 +50,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   let look = null; // 눌러서 고정한 칸 [x, y]
   let hover = null; // 커서 아래 칸
   let seeded = false;
+  let follow = !!fam.follow; // 1차원: 보는 곳이 새 줄을 따라 내려간다
 
   const world = makeWorld(rule);
   const thumbs = [];
@@ -209,7 +204,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   const notes = make ? makeNotes() : presetNotes();
 
   function makeNotes() {
-    const tips = fam.id === "life" ? MAKE_TIPS() : [];
+    const tips = MAKE_TIPS(fam.id);
     // 다른 규칙 써 보기: Life 는 모아 둔 규칙, 다른 계열은 그 계열 도감 글의 '볼 것' 가운데 규칙 바꾸기
     const more =
       fam.id === "life"
@@ -307,7 +302,21 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   const lookAt = () => look || (tool === "look" ? hover : null);
 
+  /**
+   * 새 줄이 화면 아래 4분의 1 안으로 내려오면 그 자리(재생 막대 위)에 머물게 보는 곳을 내린다.
+   * 비우기·처음으로처럼 새 줄이 화면 위로 올라가 버리면 위에서 15% 자리로 되돌린다
+   */
+  function keepHead() {
+    if (!follow || world.head === null) return;
+    const v = board.view();
+    const s = board.span();
+    const at = (world.head + 0.5 - (v.cy - s.h / 2)) / s.h;
+    if (at > 0.75) board.setView({ cx: v.cx, cy: world.head + 0.5 - 0.25 * s.h, z: v.z });
+    else if (at < 0.05) board.setView({ cx: v.cx, cy: world.head + 0.5 + 0.35 * s.h, z: v.z });
+  }
+
   function render(p = 1) {
+    keepHead();
     const lc = lookAt();
     const ex = lc ? world.explain(lc[0], lc[1]) : null;
     board.draw(world, { t: p, hover: tool !== "look" ? hover : null, look: lc ? { x: lc[0], y: lc[1], neighbors: fam.lookCells(ex, lc) } : null });
@@ -361,7 +370,10 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   function ready() {
     if (!seeded && board.ready) {
       seeded = true;
-      board.setView({ cx: 0, cy: 0, z: canvas.clientWidth < 560 ? 8 : fam.zoom });
+      const z = canvas.clientWidth < 560 ? 8 : fam.zoom;
+      board.setView({ cx: 0, cy: 0, z });
+      // 1차원: 0세대 줄이 화면 위에서 15% 쯤에 오게
+      if (fam.top) board.setView({ cx: 0, cy: board.span().h * 0.35, z });
       world.reseed(world.seed, viewRegion(0.7));
     }
     zoom.update(board.canZoom());
@@ -395,6 +407,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   function goBack() {
     if (world.back()) {
+      follow = !!fam.follow;
       status.textContent = fam.tip[tool]();
       paint();
     }
@@ -420,6 +433,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     const b = world.bounds();
     if (b) board.fit(b, { fill: 0.8, zmax: 24 });
     else board.setView({ cx: 0, cy: 0, z: fam.zoom });
+    follow = !!fam.follow;
     zoom.update(board.canZoom());
     paint();
   }
@@ -455,6 +469,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       };
     },
     onView() {
+      follow = false; // 손으로 옮기면 새 줄 따라가기를 멈춘다(처음으로·비우기·흩뿌리기·모두 보이게로 다시)
       zoom.update(board.canZoom());
       paint();
     },
@@ -472,6 +487,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     if (reseed) {
       world.reseed(randomSeed(), viewRegion(0.7));
       look = null;
+      follow = !!fam.follow;
     }
     recolor();
     syncRule();
@@ -539,6 +555,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     const s = rule.seed;
     world.scatter(s.type === "random" ? s.density : 0.3, randomSeed(), viewRegion(0.7));
     look = null;
+    follow = !!fam.follow;
     flash.hide();
     status.textContent = fam.tip[tool]();
     paint();
@@ -549,6 +566,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     setRunning(false);
     world.clear();
     look = null;
+    follow = !!fam.follow;
     flash.hide();
     status.textContent = fam.tip[tool]();
     paint();
@@ -714,7 +732,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 }
 
 /** 계열마다 만들기 화면의 '다른 규칙 써 보기'를 가져올 도감 규칙 */
-const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"] };
+const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"], elementary: ["rule-30", "rule-90", "rule-110"] };
 
 function uniqueBy(list, key) {
   const seen = new Set();
