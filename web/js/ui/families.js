@@ -57,6 +57,7 @@ const ROW_OF = { born: "birth", stay: "birth", survive: "survive", die: "survive
 const life = {
   id: "life",
   label: () => t("생명 게임 계열"),
+  rle: true, // 무늬 모음·RLE 불러오기·내려받기를 쓴다(머리 줄 rule 이 B…/S… 꼴)
   batch: false,
   zoom: 10,
   speeds: () => speeds([["slow", 4], ["normal", 10], ["fast", 30]], (n) => t("1초에 {n}세대", { n })),
@@ -685,9 +686,13 @@ function makeTablePad({ get, set, locked }) {
   };
 }
 
+/** 와이어월드의 상태 이름 */
+const WIREWORLD_STATES = () => [{ name: t("빈칸") }, { name: t("전자 머리") }, { name: t("전자 꼬리") }, { name: t("도선") }];
+
 const table = {
   id: "table",
   label: () => t("조건표"),
+  rle: true, // 와이어월드만 RLE 머리 줄 rule(WireWorld)로 주고받는다
   batch: false,
   zoom: 12,
   speeds: () => speeds([["slow", 4], ["normal", 10], ["fast", 30]], (n) => t("1초에 {n}세대", { n })),
@@ -722,11 +727,17 @@ const table = {
     family: "table",
     grid: { edges: "infinite" },
     neighborhood: "moore",
-    states: [{ name: t("빈칸") }, { name: t("전자 머리") }, { name: t("전자 꼬리") }, { name: t("도선") }],
+    states: WIREWORLD_STATES(),
     transitions: WIREWORLD.map(copyRow),
     seed: { type: "rle", data: ".BAC$C3.25C$.3C!" },
   }),
   withCode: (r) => r,
+  /** RLE 머리 줄의 규칙(parseRleRule 결과: 지금은 와이어월드뿐)을 씌운다 */
+  withRle(r, p) {
+    r.transitions = p.transitions.map(copyRow);
+    r.states = p.id === "wireworld" ? WIREWORLD_STATES() : resizeStates(r.states, p.states, "table");
+    return r;
+  },
   restore(rule, base) {
     const r = copy(rule);
     r.transitions = base.transitions.map(copyRow);

@@ -5,8 +5,8 @@
 
 import { h, icon, ICON, setTitle, reducedMotion } from "../ui/dom.js";
 import { t, num } from "../i18n.js";
-import { checkRuleFile, toRuleFile, formatRuleFile, resizeStates, sameRule, parseCode, formatCode, lockOf } from "../core/rules.js";
-import { parseRLE } from "../core/rle.js";
+import { checkRuleFile, toRuleFile, formatRuleFile, resizeStates, sameRule, parseCode, formatCode, lockOf, rleRuleOf, parseRleRule } from "../core/rules.js";
+import { parseRLE, formatRLE, readRows } from "../core/rle.js";
 import { randomSeed } from "../core/rng.js";
 import { makeWorld, regionAt } from "../ui/world.js";
 import { makeBoard } from "../ui/board.js";
@@ -19,8 +19,9 @@ import { makeSpark } from "../ui/spark.js";
 import { patternArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { load, save } from "../ui/store.js";
+import { loadPatterns } from "../ui/patterns.js";
 import { FAMILY, SCREEN_FAMILIES, LOCK_TEXT, stateSwatch } from "../ui/families.js";
-import { entryOf, tagOf, MORE_RULES, MAKE_TIPS } from "../data/catalog.js";
+import { entryOf, tagOf, patternOf, MORE_RULES, MAKE_TIPS } from "../data/catalog.js";
 import { crumb } from "./common.js";
 
 const copy = (o) => structuredClone(o);
@@ -137,6 +138,47 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   });
   const field = (label, control, hint = null) => h("div", { class: "field" }, h("span", { class: "field-label" }, label), control, hint);
 
+  // 무늬: 지금 규칙에 맞는 무늬 모음, RLE 불러오기·붙여 넣기·내려받기(Life 계열과 와이어월드)
+  const patList = h("div", { class: "file-row pattern-list", role: "group", "aria-label": t("무늬 고르기"), hidden: true });
+  const rleErrs = h("ul", { class: "errs", role: "status" });
+  const rleIn = h("input", { type: "file", accept: ".rle,.txt,text/plain", hidden: true });
+  rleIn.addEventListener("change", async () => {
+    const f = rleIn.files && rleIn.files[0];
+    rleIn.value = "";
+    if (f) showRleErrors(applyRLE(await f.text()));
+  });
+  const rleText = h("textarea", { class: "rle-in", rows: "4", cols: "32", spellcheck: "false", "aria-label": t("RLE 글"), placeholder: "x = 3, y = 3, rule = B3/S23\nbo$2bo$3o!" });
+  const pasteBox = h(
+    "div",
+    { class: "field rle-paste", hidden: true },
+    rleText,
+    h(
+      "div",
+      { class: "file-row" },
+      h("button", { class: "btn small", type: "button", onclick: () => showRleErrors(applyRLE(rleText.value)) }, t("놓기")),
+      h("button", { class: "btn small", type: "button", onclick: () => togglePaste(false) }, t("닫기")),
+    ),
+  );
+  const rleDown = h("button", { class: "btn small", type: "button", onclick: () => downloadRLE() }, icon(ICON.save), t("RLE 내려받기"));
+  const rleField = fam.rle
+    ? h(
+        "div",
+        { class: "field pattern-box" },
+        h("span", { class: "field-label" }, t("무늬")),
+        patList,
+        h(
+          "div",
+          { class: "file-row" },
+          h("button", { class: "btn small", type: "button", onclick: () => rleIn.click() }, icon(ICON.open), t("RLE 불러오기")),
+          h("button", { class: "btn small", type: "button", "aria-expanded": "false", onclick: (e) => togglePaste(pasteBox.hidden, e.currentTarget) }, t("RLE 붙여 넣기")),
+          rleDown,
+          rleIn,
+        ),
+        pasteBox,
+        rleErrs,
+      )
+    : null;
+
   const side = h(
     "aside",
     { class: "side", "aria-label": t("규칙과 기록") },
@@ -162,11 +204,12 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     ),
     h(
       "details",
-      { class: "side-sec more" },
+      { class: "side-sec more", ontoggle: (e) => e.currentTarget.open && ensurePatterns() },
       h("summary", {}, t("더 보기"), icon(ICON.down)),
       h(
         "div",
         { class: "more-body" },
+        rleField,
         statesField ? field(fam.states.label(), statesField, h("span", { class: "field-label" }, fam.states.note())) : null,
         field(
           t("규칙 파일"),
@@ -517,6 +560,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     statesOut.textContent = String(rule.states.length);
     countLabel.textContent = statCount.textContent = words.count();
     syncPaints();
+    syncPatterns();
     if (make) setTitle(code ? t("{code} 만들기", { code }) : t("새 규칙"));
     syncUrl(code);
   }
@@ -547,6 +591,110 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       onChange: (id) => (paintState = id),
     });
     paintsBox.replaceChildren(h("span", { class: "field-label" }, label), seg.el);
+  }
+
+  // ── 무늬 모음·RLE ─────────────────
+  let patterns = null; // 불러온 무늬 모음 [{ id, rule, text }]
+  let patKey = null;
+
+  /** 더 보기를 처음 열 때 무늬 모음을 불러온다 */
+  function ensurePatterns() {
+    if (!fam.rle || patterns) return;
+    loadPatterns()
+      .then((list) => {
+        patterns = list;
+        patKey = null;
+        syncPatterns();
+      })
+      .catch(() => showRleErrors([t("무늬 모음을 불러오지 못했어요.")]));
+  }
+
+  /** 지금 규칙(RLE 머리 줄 글)에 맞는 무늬만 보인다. RLE 로 못 나누는 규칙이면 내려받기를 숨긴다 */
+  function syncPatterns() {
+    if (!fam.rle) return;
+    const code = rleRuleOf(rule);
+    rleDown.hidden = !code;
+    if (!patterns) return;
+    const key = `${code}|${rule.states.length}`;
+    if (key === patKey) return;
+    patKey = key;
+    const mine = code ? patterns.filter((x) => x.rule === code) : [];
+    patList.replaceChildren(
+      ...mine.map((x) => {
+        const rows = parseRLE(x.text).rows;
+        const info = patternOf(x.id);
+        return h(
+          "button",
+          { type: "button", class: "btn small pattern-pick", title: info ? info.text() : null, onclick: () => placeRows(rows, { run: true }) },
+          info ? info.name() : x.id,
+        );
+      }),
+    );
+    patList.hidden = !mine.length;
+  }
+
+  function showRleErrors(list) {
+    rleErrs.replaceChildren(...list.map((e) => h("li", {}, e)));
+  }
+
+  function togglePaste(on, btn = null) {
+    pasteBox.hidden = !on;
+    if (btn) btn.setAttribute("aria-expanded", String(on));
+    if (on) rleText.focus();
+  }
+
+  /** 무늬를 보는 곳 가운데에 놓고(판은 비운다) 화면의 3분의 1쯤 차게 맞춘다 */
+  function placeRows(rows, { run = false } = {}) {
+    look = null;
+    setRunning(false);
+    const v = board.view();
+    world.place(rows, Math.round(v.cx), Math.round(v.cy));
+    const b = world.bounds();
+    if (b) board.fit(b, { fill: 0.34, zmax: 16 });
+    follow = !!fam.follow;
+    zoom.update(board.canZoom());
+    flash.hide();
+    paint();
+    if (run && !reducedMotion()) setRunning(true);
+  }
+
+  /**
+   * RLE 글을 놓는다. 머리 줄 rule 이 이 화면 계열의 다른 규칙이면 규칙도 그것으로 바꾼다.
+   * 틀리면 무엇이 틀렸는지 글 목록을 돌려준다
+   */
+  function applyRLE(text) {
+    const p = parseRLE(text);
+    if (!p.rows.some((row) => row.some((v) => v > 0))) return [t("RLE 로 읽을 수 없어요. 'x = …, y = …' 줄 다음에 무늬 글이 있어야 해요.")];
+    let note = null;
+    if (p.rule) {
+      const want = parseRleRule(p.rule);
+      if (!want) note = t("RLE 의 규칙({rule})은 읽을 수 없어서 지금 규칙에 놓았어요.", { rule: p.rule });
+      else if (want.neighborhood === "hex") return [t("육각 격자 무늬는 아직 놓을 수 없어요.")];
+      else if (want.family !== fam.id)
+        return [t("이 무늬는 {name} 규칙이에요. 만들기에서 계열을 고른 뒤 불러오세요.", { name: FAMILY[want.family]?.label() ?? want.family })];
+      else {
+        const next = (fam.withRle ?? fam.withCode)(copy(rule), want);
+        const why = lockOf(next);
+        if (why) return [(LOCK_TEXT[why] ?? LOCK_TEXT.birth0)()];
+        if (!sameRule(rule, next)) {
+          setRule(next);
+          note = t("무늬의 규칙 {rule:으로로} 바꿨어요.", { rule: rleRuleOf(next) ?? p.rule });
+        }
+      }
+    }
+    placeRows(p.rows);
+    if (note) flash.show(note, 3600);
+    togglePaste(false, rleField?.querySelector("[aria-expanded]"));
+    return [];
+  }
+
+  function downloadRLE() {
+    const code = rleRuleOf(rule);
+    if (!code) return;
+    const rows = readRows(world);
+    if (!rows.length) return showRleErrors([t("판이 비어 있어서 내려받을 무늬가 없어요.")]);
+    showRleErrors([]);
+    saveFile(formatRLE(rows, { rule: code, states: rule.states.length, name: rule.name }), `${rule.id || "pattern"}.rle`, "text/plain");
   }
 
   /** 고친 규칙을 주소에 남긴다(그대로 나눌 수 있게). hashchange 는 일으키지 않는다 */
@@ -643,8 +791,12 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   }
 
   function download() {
-    const blob = new Blob([formatRuleFile(toRuleFile(rule))], { type: "application/json" });
-    const a = h("a", { href: URL.createObjectURL(blob), download: `${rule.id || "rule"}.json` });
+    saveFile(formatRuleFile(toRuleFile(rule)), `${rule.id || "rule"}.json`, "application/json");
+  }
+
+  function saveFile(text, name, type) {
+    const blob = new Blob([text], { type });
+    const a = h("a", { href: URL.createObjectURL(blob), download: name });
     document.body.append(a);
     a.click();
     a.remove();
