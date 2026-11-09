@@ -424,19 +424,37 @@ export function ruleView(main, { preset = null, params = {}, mine = null } = {})
     peek.replaceChildren(...fam.peek(ex, rule).filter(Boolean));
     peek.hidden = false;
     editor.mark(ex);
-    // 칸 오른쪽 아래에 두되, 무대 밖으로 나가면 반대쪽으로
+    // 칸 오른쪽 아래가 먼저. 무대 밖으로 나가거나 판 위에 뜬 재생 막대·확대 단추에 걸리면 왼쪽 아래 → 오른쪽 위 → 왼쪽 위
     const box = board.cellBox(x, y);
     const sw = stage.clientWidth;
     const sh = stage.clientHeight;
     const pw = peek.offsetWidth;
     const ph = peek.offsetHeight;
     const gapPx = box.size * 1.6 + 10;
-    let left = box.x + gapPx;
-    let top = box.y + gapPx;
-    if (left + pw > sw - 8) left = box.x - gapPx - pw;
-    if (top + ph > sh - 8) top = box.y - gapPx - ph;
-    peek.style.left = `${Math.max(8, left)}px`;
-    peek.style.top = `${Math.max(8, top)}px`;
+    const st = stage.getBoundingClientRect();
+    const covers = [capsule.el, zoom.el]
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.width && r.height)
+      .map((r) => ({ l: r.left - st.left - 6, t: r.top - st.top - 6, r: r.right - st.left + 6, b: r.bottom - st.top + 6 }));
+    const clear = (l, t) => !covers.some((c) => l < c.r && c.l < l + pw && t < c.b && c.t < t + ph);
+    const inside = (l, t) => l >= 8 && t >= 8 && l + pw <= sw - 8 && t + ph <= sh - 8;
+    const right = box.x + gapPx;
+    const leftSide = box.x - gapPx - pw;
+    const below = box.y + gapPx;
+    const above = box.y - gapPx - ph;
+    const spots = [
+      [right, below],
+      [leftSide, below],
+      [right, above],
+      [leftSide, above],
+    ];
+    let [left, top] = spots.find(([l, t]) => inside(l, t) && clear(l, t)) ?? [right + pw > sw - 8 ? leftSide : right, below + ph > sh - 8 ? above : below];
+    left = Math.max(8, Math.min(left, sw - 8 - pw));
+    top = Math.max(8, top);
+    // 그래도 재생 막대에 걸리면 막대 위로 올린다
+    for (const c of covers) if (left < c.r && c.l < left + pw && top < c.b && c.t < top + ph && c.t > sh / 2) top = Math.max(8, c.t - ph);
+    peek.style.left = `${left}px`;
+    peek.style.top = `${top}px`;
   }
 
   /** 보이는 넓이에 k 를 곱한 네모 */
@@ -692,11 +710,11 @@ export function ruleView(main, { preset = null, params = {}, mine = null } = {})
    */
   function applyRLE(text) {
     const p = parseRLE(text);
-    if (!p.rows.some((row) => row.some((v) => v > 0))) return [t("RLE 로 읽을 수 없어요. 'x = …, y = …' 줄 다음에 무늬 글이 있어야 해요.")];
+    if (!looksLikeRLE(text) || !p.rows.some((row) => row.some((v) => v > 0))) return [t("RLE 로 읽을 수 없어요. 'x = …, y = …' 줄 다음에 무늬 글이 있어야 해요.")];
     let note = null;
     if (p.rule) {
       const want = parseRleRule(p.rule);
-      if (!want) note = t("RLE 의 규칙({rule})은 읽을 수 없어서 지금 규칙에 놓았어요.", { rule: p.rule });
+      if (!want) note = t("RLE 의 규칙({rule})은 읽을 수 없어서 지금 규칙 그대로 놓았어요.", { rule: p.rule });
       else if (want.neighborhood === "hex") return [t("육각 격자 무늬는 아직 놓을 수 없어요.")];
       else if (want.family !== fam.id)
         return [t("이 무늬는 {name} 규칙이에요. 만들기에서 계열을 고른 뒤 불러오세요.", { name: FAMILY[want.family]?.label() ?? want.family })];
@@ -968,6 +986,18 @@ export function ruleView(main, { preset = null, params = {}, mine = null } = {})
 
 /** 계열마다 만들기 화면의 '다른 규칙 써 보기'를 가져올 도감 규칙 */
 const FAMILY_ENTRIES = { ant: ["langtons-ant", "ant-llrr", "ant-lrrrrrllr"], elementary: ["rule-30", "rule-90", "rule-110"], table: ["wireworld"], cyclic: ["cyclic-14"] };
+
+/**
+ * RLE 로 볼 수 있는 글인가: # 줄과 머리 줄(x = …, y = …)을 빼면 RLE 글자(b o . A–X p–y 숫자 $ !)와 빈칸만 있어야 한다.
+ * 엔진의 parseRLE 는 다른 소문자도 산 칸으로 읽어서, 'hello' 나 주소를 붙여 넣으면 엉뚱한 칸이 놓인다(검수 1428)
+ */
+function looksLikeRLE(text) {
+  const body = String(text ?? "")
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*#/.test(line) && !/^\s*x\s*=\s*\d+\s*,\s*y\s*=\s*\d+/i.test(line))
+    .join("");
+  return body.trim().length > 0 && /^[\sbo.A-Xp-y0-9$!]*$/.test(body);
+}
 
 function uniqueBy(list, key) {
   const seen = new Set();

@@ -505,9 +505,9 @@ const particle = (word, pair) => (lang() === "ko" ? josa(word, pair).slice(Strin
 /** 조건표 줄이 맞지 않는 까닭(core/table.js 의 tableProblem 낱말) → 화면 글 */
 function tableProblemText(p) {
   if (p.why === "lock") return LOCK_TEXT.empty();
-  if (p.why === "many") return t("세는 상태는 {max}가지까지예요. 다른 줄에서 세는 상태를 골라 보세요.", { max: MAX_COUNTED });
+  if (p.why === "many") return t("이웃에서 세는 상태는 {max}가지까지예요. 다른 줄이 세는 상태를 골라 보세요.", { max: MAX_COUNTED });
   if (p.why === "list") return t("줄은 {max}개까지예요.", { max: MAX_TRANSITIONS });
-  if (p.why === "zero") return t("빈칸은 셀 수 없어요.");
+  if (p.why === "zero") return t("빈칸은 세는 상태로 고를 수 없어요.");
   return t("이 줄은 쓸 수 없어요.");
 }
 
@@ -645,7 +645,7 @@ function makeTablePad({ get, set, locked }) {
           String(c),
         );
       });
-      const of = stBtn(i, "of", w.state, t("셀 상태"));
+      const of = stBtn(i, "of", w.state, t("세는 상태"));
       of.title = t("누르면 다음 상태로 바뀌어요. 마지막 다음은 '늘'(조건 없음)이에요.");
       const when = h(
         "span",
@@ -750,7 +750,7 @@ const table = {
   codeOther: () => t("조건표는 표기가 없어요. 줄을 고치거나 규칙 파일을 불러오세요."),
   states: {
     label: () => t("상태 수"),
-    note: () => t("늘리면 줄에서 새 상태를 쓸 수 있어요. 줄이면 없어지는 상태를 쓰는 줄은 지워져요."),
+    note: () => t("상태를 더하면 줄에서 새 상태를 쓸 수 있어요. 빼면 없어지는 상태를 쓰던 줄은 지워져요."),
     min: 2,
     max: MAX_TABLE_STATES,
   },
