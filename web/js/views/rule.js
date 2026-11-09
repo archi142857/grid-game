@@ -147,7 +147,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
         { class: "readouts" },
         h("div", { class: "readout" }, h("span", {}, words.step()), genNum),
         h("div", { class: "readout" }, h("span", {}, words.count()), popNum),
-        h("div", { class: "readout" }, h("span", {}, t("바뀐 칸")), chgNum),
+        h("div", { class: "readout" }, h("span", {}, words.changed ? words.changed() : t("바뀐 칸")), chgNum),
       ),
       spark.el,
     ),
@@ -322,7 +322,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     board.draw(world, { t: p, hover: tool !== "look" ? hover : null, look: lc ? { x: lc[0], y: lc[1], neighbors: fam.lookCells(ex, lc) } : null });
     genNum.textContent = statGen.textContent = num(world.gen);
     popNum.textContent = statPop.textContent = num(world.count);
-    chgNum.textContent = num(world.lastChanged);
+    chgNum.textContent = num(fam.changed ? fam.changed(world) : world.lastChanged);
     const now = performance.now();
     if (!loop.running || now - sparkAt > 250) {
       sparkAt = now;

@@ -17,7 +17,7 @@ const copy = (o) => structuredClone(o);
 /** 끝없는 격자에서 돌릴 수 없는 까닭(core/rules.js 의 lockOf 낱말) → 화면 글 */
 export const LOCK_TEXT = {
   birth0: () => blockedReason({ birth: [0] }),
-  odd: () => t("끝없는 격자에서는 홀수 번호를 쓸 수 없어요. 000 이 켜지면 빈 곳이 끝없이 한꺼번에 켜지거든요."),
+  odd: () => t("끝없는 격자에서는 홀수 번호를 쓸 수 없어요. 홀수 번호는 셋 다 꺼진 곳(000)에서도 켜져서, 빈 곳이 끝없이 한꺼번에 켜지거든요."),
   empty: () => t("끝없는 격자에서는 이웃이 없는 빈칸이 바뀌는 줄을 쓸 수 없어요. 빈 곳이 끝없이 한꺼번에 바뀌거든요."),
 };
 
@@ -208,7 +208,7 @@ function makeAntPad({ get, set }) {
               "tr",
               {},
               h("th", {}, String(s)),
-              row.map(([w, turn, next]) => h("td", { title: t("{color:으로로} 칠하고 {dir}, 속 상태 {s}", { color: name(w), dir: TURN_WORD[turn](), s: next }) }, `${w} ${turn} ${next}`)),
+              row.map(([w, turn, next]) => h("td", { title: t("{color:으로로} 바꾸고 {dir}, 다음 속 상태 {s}", { color: name(w), dir: TURN_WORD[turn](), s: next }) }, `${w} ${turn} ${next}`)),
             ),
           ),
         ),
@@ -283,7 +283,10 @@ const ant = {
     aria: () => t("걸음마다 칠한 칸 수"),
     step: () => t("걸음"),
     count: () => t("칠한 칸"),
+    // 개미는 한 걸음에 늘 개미 수만큼 칸이 바뀌어서 '바뀐 칸' 대신 개미 수를 보인다
+    changed: () => t("개미"),
   },
+  changed: (world) => world.agents.length,
   canvasLabel: () => t("끝없는 격자. 끌면 둘러보고, 칸을 누르면 칸 색이 바뀌어요"),
   blank: () => ({
     id: "my-rule",
@@ -333,7 +336,7 @@ const ant = {
     const letter = ex.turn;
     const top = h("div", { class: "peek-top" }, h("span", { class: "num" }, letter ?? "?"), h("span", {}, t("도는 쪽")));
     const now = h("div", {}, t("지금 "), h("b", {}, name(ex.now)), ex.why === "ant" ? [t(", 다음 걸음 "), h("b", {}, name(ex.next))] : null);
-    const say = letter ? t("{turn} 이 칸을 {color:으로로} 칠해요.", { turn: TURN_SAY[letter](), color: name(ex.write) }) : null;
+    const say = letter ? t("{turn} 이 칸을 {color:으로로} 바꿔요.", { turn: TURN_SAY[letter](), color: name(ex.write) }) : null;
     if (ex.why === "ant") {
       return [top, now, h("div", {}, t("개미가 있어요. "), say), rule.machine ? h("div", {}, t("개미의 속 상태: {s}", { s: ex.state })) : null];
     }

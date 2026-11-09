@@ -25,7 +25,8 @@ const EYE = [
   [0, 1],
   [-1, 0],
 ]; // 개미 눈이 가는 쪽(dir 0 위 · 1 오른쪽 · 2 아래 · 3 왼쪽)
-const SQUARE_BELOW = 6; // 이보다 작으면 둥근 점 대신 네모로, 빈칸 점은 그리지 않는다
+const SQUARE_BELOW = 6; // 이보다 작으면(기기 픽셀) 둥근 점 대신 네모로, 빈칸 점은 그리지 않는다
+const DOT_MIN_CSS = 3; // css px 로도 이보다 작으면 네모로(폰처럼 dpr 이 큰 화면의 작은 칸: 칸이 많아 둥근 점이 느리다)
 
 /** min·max 는 칸 한 변의 css px */
 export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
@@ -183,6 +184,8 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
   // ── 그리기 ─────────────────
   /** 상태별 점 반지름(기기 픽셀) */
   const R = (s) => c * (rad[s] ?? 0);
+  /** 둥근 점과 빈칸 점을 그릴 만큼 칸이 큰가 */
+  const roundDots = () => c >= Math.max(SQUARE_BELOW, DOT_MIN_CSS * dpr);
 
   /** 빈칸 점: 칸 하나짜리 무늬를 깔아 둔다(칸이 정수 픽셀이라 어긋나지 않는다) */
   function drawLattice() {
@@ -225,7 +228,7 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
       ctx.rect(ox, oy, frameSize.w * c, frameSize.h * c);
       ctx.clip();
     }
-    if (c >= SQUARE_BELOW) drawLattice();
+    if (roundDots()) drawLattice();
     const head = src.head ?? null;
     if (c < PIXEL_BELOW) drawPixels(src, v, head);
     else drawDots(src, v, ease(Math.max(0, Math.min(1, t))), head);
@@ -242,7 +245,7 @@ export function makeBoard(canvas, { onResize = null, min = 1, max = 48 } = {}) {
    */
   function drawDots(src, { x0, y0, x1, y1 }, e, head) {
     const paths = [];
-    const square = c < SQUARE_BELOW;
+    const square = !roundDots();
     const n = rad.length;
     const enter = ENTER();
     const exit = EXIT();
