@@ -1,7 +1,7 @@
 // 영어 사전. 열쇠는 화면에서 t("…") 로 부르는 한국어 틀 그대로다. 비어 있는 열쇠는 한국어가 나간다.
 // 자리표: 한국어의 {n:이가} 는 영어에서 {n} 로 쓴다. 단수·복수는 {n|neighbor|neighbors} (값이 1이면 앞, 아니면 뒤).
 // 용어: 칸 cell · 산 칸 Alive / live cell · 빈칸 Empty / empty cell · 세대 generation · 태어남 Born · 살아남음 Survive
-//       도감 Field guide · 처음으로 Reset · 흩뿌리기 Scatter · 비우기 Clear · 손 Tool(이동 Move · 그리기 Draw · 살펴보기 Inspect)
+//       도감 Catalog · 처음으로 Reset · 흩뿌리기 Scatter · 비우기 Clear · 손 Tool(이동 Move · 그리기 Draw · 살펴보기 Inspect)
 // 규칙 파일의 이름·설명·상태 이름(콘웨이의 생명 게임, 꺼지는 중 …)도 여기 있다. app.js 가 t() 로 감싸 화면에 낸다.
 // index.html 의 고정 글은 app.js 가 data-t·data-t-aria 열쇠로 갈아 끼운다.
 
@@ -54,10 +54,10 @@ export const EN = {
   "읽을 수 없는 표기예요. 예: B3/S23, B2/S/C3, 23/3": "Can't read that notation. Examples: B3/S23, B2/S/C3, 23/3",
 
   // ── views/common.js ─────────────────────────────
-  "도감": "Field guide",
+  "도감": "Catalog",
   "없는 화면": "Not found",
   "없는 화면이에요": "There's no such page",
-  "주소를 다시 확인하거나 도감에서 골라 주세요.": "Check the address, or pick a rule from the field guide.",
+  "주소를 다시 확인하거나 도감에서 골라 주세요.": "Check the address, or pick a rule from the catalog.",
 
   // ── views/home.js ─────────────────────────────
   "끝없는 격자. 끌면 둘러보고, 칸을 누르면 살리거나 비워요": "Endless grid. Drag to look around; press a cell to bring it to life or clear it",
@@ -319,9 +319,9 @@ export const EN = {
   "세포 자동자를 바로 돌려 보고, 규칙을 직접 만들어 보는 곳이에요.": "A place to run cellular automata right away and make rules of your own.",
   "무엇을 하나요": "What you can do",
   "이름난 규칙 {n}가지를 도감으로 모았어요. 태어남과 살아남음의 숫자를 눌러 규칙을 고치거나, 아예 새로 만들 수 있어요.":
-    "The field guide collects {n} famous rules. Press the Born and Survive numbers to change a rule, or make a brand-new one.",
+    "The catalog collects {n} famous rules. Press the Born and Survive numbers to change a rule, or make a brand-new one.",
   "칸 위를 걷는 개미도 있어요. 칸 색마다 개미가 도는 쪽을 글자(L·R·N·U)로 정해 나만의 개미를 만들 수 있고, 속 상태가 있는 터마이트도 도감에 있어요.":
-    "There are ants that walk across the cells, too. Pick a turn letter (L, R, N or U) for each cell color to make an ant of your own, and the field guide also has a turmite with inner states.",
+    "There are ants that walk across the cells, too. Pick a turn letter (L, R, N or U) for each cell color to make an ant of your own, and the catalog also has a turmite with inner states.",
   "한 줄이 세대마다 아래로 쌓이는 1차원 규칙과, 상태마다 언제 무엇으로 바뀔지 줄로 적는 조건표도 있어요. 조건표로는 도선 위로 전자가 흐르는 와이어월드 같은 규칙을 만들 수 있어요.":
     "There are also 1D rules, where one row per generation stacks downward, and table rules, where you write lines saying when each state changes and into what. With table rules you can build rules like Wireworld, where electrons flow along wires.",
   "처음이라면 첫 화면의 점 단추만 눌러 봐도 충분해요. 더 파고들고 싶다면 B3/S23 같은 표기를 바로 고쳐 쓰거나, 규칙 파일을 내려받아 고친 뒤 다시 불러오세요. 가입은 없고, 설정은 이 브라우저에만 남아요.":
