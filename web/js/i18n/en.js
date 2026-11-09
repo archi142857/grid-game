@@ -225,6 +225,8 @@ export const EN = {
   "무엇을 하나요": "What you can do",
   "이름난 규칙 {n}가지를 도감으로 모았어요. 태어남과 살아남음의 숫자를 눌러 규칙을 고치거나, 아예 새로 만들 수 있어요.":
     "The field guide collects {n} famous rules. Press the Born and Survive numbers to change a rule, or make a brand-new one.",
+  "칸 위를 걷는 개미도 있어요. 칸 색마다 개미가 도는 쪽을 글자(L·R·N·U)로 정해 나만의 개미를 만들 수 있고, 속 상태가 있는 터마이트도 도감에 있어요.":
+    "There are ants that walk across the cells, too. Pick a turn letter (L, R, N or U) for each cell color to make an ant of your own, and the field guide also has a turmite with inner states.",
   "처음이라면 첫 화면의 점 단추만 눌러 봐도 충분해요. 더 파고들고 싶다면 B3/S23 같은 표기를 바로 고쳐 쓰거나, 규칙 파일을 내려받아 고친 뒤 다시 불러오세요. 가입은 없고, 설정은 이 브라우저에만 남아요.":
     "If you're new, pressing the dot buttons on the home page is enough. To dig deeper, edit notation like B3/S23 directly, or download a rule file, change it and open it again. There's no sign-up, and your settings stay in this browser only.",
   "세포 자동자의 짧은 역사": "A short history of cellular automata",
@@ -355,8 +357,8 @@ export const EN = {
   "랭턴의 개미": "Langton's ant",
   "크리스 랭턴, 1986": "Chris Langton, 1986",
   "개미 한 마리가 오래 헤매다가 어느 순간 곧은 길을 내기 시작해요.": "A single ant wanders for a long time, then suddenly starts building a straight road.",
-  "1986년 크리스 랭턴이 만든 규칙이에요. 개미는 빈칸에서는 오른쪽, 칠해진 칸에서는 왼쪽으로 돌고, 밟고 있던 칸을 뒤집은 다음 한 칸 앞으로 가요.":
-    "Chris Langton created this rule in 1986. On an empty cell the ant turns right, on a colored cell it turns left; then it flips the cell it was standing on and moves forward one cell.",
+  "1986년 크리스 랭턴이 만든 규칙이에요. 개미는 빈칸에서는 오른쪽, 칠한 칸에서는 왼쪽으로 돌고, 밟고 있던 칸을 뒤집은 다음 한 칸 앞으로 가요.":
+    "Chris Langton created this rule in 1986. On an empty cell the ant turns right, on a painted cell it turns left; then it flips the cell it was standing on and moves forward one cell.",
   "처음 몇백 걸음은 단정한 무늬를 그리다가, 1만 걸음 가까이 어지럽게 헤매요. 그러다 104걸음마다 같은 모양을 되풀이하는 '고속도로'를 한쪽으로 끝없이 깔아요. 지금까지 해 본 시작 모습에서는 모두 고속도로가 나왔지만, 늘 그런지는 아직 아무도 증명하지 못했어요.":
     "For the first few hundred steps it draws neat patterns, then it wanders chaotically for nearly 10,000 steps. After that it lays a 'highway' that repeats the same shape every 104 steps and runs off in one direction forever. Every starting pattern tried so far has ended in a highway, but no one has proved that this always happens.",
   "색 하나 더하기": "Add a color",
@@ -627,6 +629,9 @@ export const EN = {
     "Place no more than {cells} {cells|cell|cells} so that some cells are still alive after {gens} generations.",
   "작은 무늬가 오래 요동치기도 해요. 다섯 칸짜리 R-펜토미노는 1103세대가 지나서야 잠잠해져요.":
     "Small patterns can churn for a long time. The five-cell R-pentomino doesn't settle down until generation 1103.",
+  "멈춘 무늬나 깜빡이는 무늬라도 산 칸만 남아 있으면 통과예요.": "Even a still or blinking pattern passes, as long as some cells stay alive.",
+  "같은 모양 없이 버티기": "Survive without repeating",
+  "칸을 {cells}개까지만 놓아, {gens}세대가 지나도록 같은 모양이 다시 나오지 않게 해 보세요. 자리만 옮겨 간 같은 모양도 다시 나온 거예요.": "Place no more than {cells} {cells|cell|cells} so that no shape comes back for {gens} generations. The same shape in a new spot counts as coming back too.",
   "스스로 늘어나기": "Multiply",
   "하이라이프(B36/S23)에서 칸을 {cells}개까지만 놓아, {gens}세대 뒤에 산 칸이 {min}개 이상이 되게 해 보세요.":
     "In HighLife (B36/S23), place no more than {cells} {cells|cell|cells} so that at least {min} cells are alive after {gens} generations.",

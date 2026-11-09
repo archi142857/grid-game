@@ -37,6 +37,15 @@ const CHALLENGES = {
   "life-survive": {
     title: () => t("오래 버티기"),
     task: (c) => t("칸을 {cells}개까지만 놓아, {gens}세대가 지나도 산 칸이 남아 있게 해 보세요.", { cells: n(lim(c).cells), gens: n(goal(c).gens) }),
+    hint: () => t("멈춘 무늬나 깜빡이는 무늬라도 산 칸만 남아 있으면 통과예요."),
+  },
+  "life-no-repeat": {
+    title: () => t("같은 모양 없이 버티기"),
+    task: (c) =>
+      t("칸을 {cells}개까지만 놓아, {gens}세대가 지나도록 같은 모양이 다시 나오지 않게 해 보세요. 자리만 옮겨 간 같은 모양도 다시 나온 거예요.", {
+        cells: n(lim(c).cells),
+        gens: n(goal(c).gens),
+      }),
     hint: () => t("작은 무늬가 오래 요동치기도 해요. 다섯 칸짜리 R-펜토미노는 1103세대가 지나서야 잠잠해져요."),
   },
   "highlife-grow": {
