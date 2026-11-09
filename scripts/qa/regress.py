@@ -15,6 +15,11 @@
 - 전체 화면 단추를 마우스로 누른 뒤 스페이스는 재생·일시정지를 한 번만
 - 표기를 고쳐 쓰다 격자를 누르면 고친 표기가 들어간다
 - 폰 안내는 세로로 쓸 때·전체 화면에서 끌 때는 안 뜬다
+- 폰 안내는 손가락을 댄 채 오래 끌다 떼면 뗄 때 한 번 더 뜬다(9f1f833)
+
+261109 쪽지
+- 프론트엔드 · 살펴보기 말풍선이 재생 막대에 가림(PC, 재생 막대 바로 위 칸들)
+- 프론트엔드 · RLE 아닌 글도 칸으로 놓임(붙여 넣기)
 """
 
 from common import (
@@ -24,6 +29,14 @@ from common import (
 
 a = args(__doc__)
 check = Checks("regress", a.out)
+
+# 살펴보기 말풍선이 보이고 재생 막대와 겹치면 참
+PEEK_UNDER_CAPSULE_JS = """() => {
+  const p = document.querySelector('.board-wrap .peek'), c = document.querySelector('.board-wrap .capsule');
+  if (!p || p.hidden || !c) return false;
+  const a = p.getBoundingClientRect(), b = c.getBoundingClientRect();
+  return a.width > 0 && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+}"""
 
 # 보이는 글씨마다 글씨색과 뒤 바탕(반투명은 겹쳐서)의 대비를 잰다. 꺼진 단추는 뺀다(WCAG 도 뺀다).
 # 작은 글씨 4.5:1, 큰 글씨(24px 이상, 굵으면 18.66px 이상) 3:1 밑인 것을 돌려준다
@@ -206,6 +219,20 @@ with sync_playwright() as p:
     check("phone home: sideways drag shows a hint", fl.is_visible(), fl.text_content() if fl.count() else "")
     page.screenshot(path=f"{a.out}/phone390_touch_hint.png")
     page.wait_for_timeout(2800)  # 안내가 사라질 때까지
+    # 손가락을 댄 채 3초 끌다 떼면(처음 안내는 2.4초 뒤 손가락 밑에서 사라진다) 뗄 때 한 번 더 뜬다(9f1f833)
+    cv = box(page, ".hero canvas")
+    x0, y0 = cv["x"] + cv["w"] * 0.2, cv["y"] + cv["h"] / 2
+    t._send("touchStart", [(x0, y0)])
+    for i in range(1, 13):
+        t._send("touchMove", [(x0 + i * 15, y0 + 1)])
+        page.wait_for_timeout(16)
+    page.wait_for_timeout(3000)
+    gone = not fl.is_visible()
+    t._send("touchEnd", [])
+    page.wait_for_timeout(200)
+    again = fl.is_visible()
+    check("phone home: long sideways drag → hint again on release", gone and again, f"gone while held {gone}, again {again}")
+    page.wait_for_timeout(2800)
     cv = box(page, ".hero canvas")
     t.drag(cv["x"] + cv["w"] / 2, cv["y"] + cv["h"] * 0.7, cv["x"] + cv["w"] / 2 + 6, cv["y"] + cv["h"] * 0.2)
     check("phone home: vertical swipe shows no hint", not fl.is_visible(), fl.text_content())
@@ -217,6 +244,52 @@ with sync_playwright() as p:
     check("phone full: one-finger drag shows no hint", not fl.is_visible(), fl.text_content())
     t.tap_el(".hero .zoom button[aria-label='전체 화면 끝내기']")
     page.wait_for_timeout(500)
+    ctx.close()
+
+    # 261109-1. 살펴보기 말풍선이 재생 막대에 가림: 막대 위 200px 부터 막대 바로 위까지 칸에 올려 본다
+    for vp in ("pc1440", "pc1024"):
+        ctx = new_context(b, vp, "light", "reduce")
+        page = ctx.new_page()
+        for h in ("#/r/conway-life", "#/make?family=table"):
+            page.goto(a.url + h, wait_until="networkidle")
+            settle(page, 400)
+            page.evaluate("document.querySelector(\".transport [role=radio][data-id='look']\").click()")
+            page.evaluate("scrollTo(0, 0)")
+            page.wait_for_timeout(100)
+            cap = box(page, ".board-wrap .capsule")
+            cv = box(page, ".board-wrap canvas")
+            hits = []
+            for dy in range(200, 10, -20):
+                page.mouse.move(cv["x"] + cv["w"] / 2 + 40, cap["y"] - dy)
+                page.wait_for_timeout(120)
+                hit = page.evaluate(PEEK_UNDER_CAPSULE_JS)
+                if hit:
+                    hits.append(dy)
+            if hits:
+                page.mouse.move(cv["x"] + cv["w"] / 2 + 40, cap["y"] - hits[0])
+                page.wait_for_timeout(150)
+                page.screenshot(path=f"{a.out}/{vp}_peek_capsule_{h.split('/')[-1].split('?')[0]}.png")
+            check(f"look peek stays clear of the play bar ({vp} {h})", not hits, f"막대 위 {hits}px 에서 겹침")
+            page.mouse.move(2, 2)
+        ctx.close()
+
+    # 261109-2. RLE 아닌 글: 붙여 넣으면 까닭이 뜨고 판은 그대로
+    ctx = new_context(b, "pc1440", "light", "reduce")
+    page = ctx.new_page()
+    page.goto(a.url + "#/r/conway-life", wait_until="networkidle")
+    settle(page, 400)
+    page.locator("details.more summary").click()
+    page.wait_for_timeout(300)
+    page.locator(".pattern-box button", has_text="RLE 붙여 넣기").click()
+    for text in ("hello", "https://conwaylife.com/wiki/Glider"):
+        c0 = nums(page, RULE_NUMS)[:2]
+        if not page.locator(".rle-in").is_visible():
+            page.locator(".pattern-box button", has_text="RLE 붙여 넣기").click()
+        page.locator(".rle-in").fill(text)
+        page.locator(".rle-paste button", has_text="놓기").click()
+        page.wait_for_timeout(250)
+        errs = " ".join(page.locator(".pattern-box .errs li").all_text_contents())
+        check(f"paste non-RLE '{text[:20]}': refused, board kept", bool(errs) and nums(page, RULE_NUMS)[:2] == c0, f"{c0} → {nums(page, RULE_NUMS)[:2]} {errs}")
     ctx.close()
     b.close()
 check.done()

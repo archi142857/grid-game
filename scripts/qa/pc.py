@@ -289,11 +289,11 @@ with sync_playwright() as p:
     page.locator(".stepper button[aria-label='상태 하나 빼기']").click()
     check("rule: states - -> back", inp.input_value() == "B3/S23")
     with page.expect_download() as dl:
-        page.locator(".file-row button", has_text="내려받기").click()
+        page.get_by_role("button", name="내려받기", exact=True).click()  # RLE 내려받기와 따로
     j = json.loads(open(dl.value.path(), encoding="utf-8").read())
     check("rule: download is a rule file", j.get("family") == "life" and j.get("rule", {}).get("birth") == [3], dl.value.suggested_filename)
     hl = (REPO / "web/data/rules/highlife.json").read_text(encoding="utf-8")
-    up = page.locator(".file-row input[type=file]")
+    up = page.locator(".file-row input[type=file][accept*=json]")  # RLE 파일 칸과 따로
     up.set_input_files(files=[{"name": "hl.json", "mimeType": "application/json", "buffer": hl.encode()}])
     page.wait_for_timeout(300)
     check("rule: upload applies", inp.input_value() == "B36/S23", inp.input_value())

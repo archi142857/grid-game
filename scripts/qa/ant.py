@@ -72,6 +72,11 @@ def counts(page):
     return nums(page, RULE_NUMS)[:2]  # [걸음, 칠한 칸]
 
 
+def ant_count(page):
+    """알림판 셋째 칸 '개미'(80d627e 부터 '바뀐 칸' 대신)"""
+    return nums(page, RULE_NUMS)[2]
+
+
 def open_rule(page, rid):
     """같은 주소로 다시 가면 화면이 새로 안 그려져서(hashchange 가 없다) 그때는 새로 고친다"""
     if page.evaluate("location.hash") == f"#/r/{rid}":
@@ -97,6 +102,7 @@ with sync_playwright() as p:
     ctx = new_context(b, "pc1440", "light", "reduce")
     page = ctx.new_page()
     log = Log(page)
+    page.goto(a.url, wait_until="networkidle")  # 빈 쪽에서 fetch 하면 로컬 서버(CORS 머리 없음)에서 막힌다
     ids = page.evaluate("async (u) => (await (await fetch(u + 'data/rules/index.json')).json())", a.url)
     rules = {i: page.evaluate("async ([u, i]) => (await (await fetch(u + `data/rules/${i}.json`)).json())", [a.url, i]) for i in ids}
     ants = [i for i in ids if rules[i].get("family") == "ant"]
@@ -107,6 +113,8 @@ with sync_playwright() as p:
     for rid in ants:
         open_rule(page, rid)
         check(f"{rid}: starts at 0 steps, no hint", counts(page) == [0, 0] and not page.locator(".board-wrap .stage-hint").is_visible(), counts(page))
+        ro = page.evaluate("[...document.querySelectorAll('.side .readout > *')].map(e => e.textContent.trim())")
+        check(f"{rid}: readout shows the ant count", ro[4:6] == ["개미", str(len(rules[rid]["agents"]))], ro)
         r = RefAnts(rules[rid]["rule"], rules[rid]["agents"])
         got, want, done = [], [], 0
         for m in MARKS:
@@ -171,7 +179,7 @@ with sync_playwright() as p:
     page.mouse.move(2, 2)
     press(page, "ArrowRight", 3)
     page.wait_for_timeout(100)
-    check("ant hand: new ant walks too (2 ants)", counts(page) == [3, r.step(3)], f"{counts(page)} / ref {r.steps}, {len(r.cells)}")
+    check("ant hand: new ant walks too (2 ants)", counts(page) == [3, r.step(3)] and ant_count(page) == 2, f"{counts(page)} / ref {r.steps}, {len(r.cells)}, 개미 {ant_count(page)}")
     g = r.ants[1]
     acts = []
     for _ in range(4):  # 돌리기 → … → 왼쪽을 보면 치운다
@@ -187,7 +195,7 @@ with sync_playwright() as p:
         if act == "remove":
             break
         g = next(q for q in r.ants if q is g)
-    check("ant hand: turn clockwise, then remove (matches reference)", counts(page)[1] == len(r.cells) and acts[-1] == "remove", f"{acts} site {counts(page)} ref {len(r.cells)}")
+    check("ant hand: turn clockwise, then remove (matches reference)", counts(page)[1] == len(r.cells) and acts[-1] == "remove" and ant_count(page) == 1, f"{acts} site {counts(page)} ref {len(r.cells)}, 개미 {ant_count(page)}")
     page.locator(".transport [role=radio][data-id='pan']").click()
     page.mouse.click(*cell_center(page, BOARD, -12, 6, Z))
     r.cells[(-12, 6)] = 1
