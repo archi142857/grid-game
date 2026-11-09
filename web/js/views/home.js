@@ -555,7 +555,7 @@ function makeShelf(presets) {
             "span",
             { class: "spec-text" },
             h("span", { class: "spec-name" }, t("새 규칙 만들기")),
-            h("span", { class: "spec-meta" }, t("점을 눌러 숫자를 골라요")),
+            h("span", { class: "spec-meta" }, t("계열을 고르고 나만의 규칙을 만들어요")),
           ),
         ),
       ),
