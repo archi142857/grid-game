@@ -20,6 +20,8 @@ import { patternArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { load, save } from "../ui/store.js";
 import { loadPatterns } from "../ui/patterns.js";
+import { addMine, mineGroup, MAX_MINE } from "../ui/myrules.js";
+import { canStore } from "../ui/store.js";
 import { FAMILY, SCREEN_FAMILIES, LOCK_TEXT, stateSwatch } from "../ui/families.js";
 import { entryOf, tagOf, patternOf, MORE_RULES, MAKE_TIPS } from "../data/catalog.js";
 import { crumb } from "./common.js";
@@ -34,14 +36,15 @@ const MAKE_LEAD = {
   table: () => t("줄의 상태 단추와 이웃 수를 눌러 규칙을 고치고, 칠할 상태를 골라 칸을 칠해요. 마음에 들면 규칙 파일로 내려받으세요."),
 };
 
-export function ruleView(main, { preset = null, params = {} } = {}) {
+/** mine: 내 규칙(#/mine/<key>)으로 열었으면 그 열쇠. preset 은 담아 둔 규칙 */
+export function ruleView(main, { preset = null, params = {}, mine = null } = {}) {
   const make = !preset;
   // 주소의 ?rule=B36/S23 · LLRR 로 시작할 수 있다(고친 규칙을 주소로 나눈다). 만들기는 표기의 계열을 따른다
   const fromUrl = params.rule ? parseCode(params.rule) : null;
   const famId = make ? (fromUrl && FAMILY[fromUrl.family] ? fromUrl.family : FAMILY[params.family] ? params.family : "life") : preset.family;
   const fam = FAMILY[famId] ?? FAMILY.life;
   const base = make ? fam.blank() : preset;
-  const entry = make ? null : entryOf(preset.id);
+  const entry = make || mine ? null : entryOf(preset.id);
   let rule = copy(base);
   if (fromUrl && fromUrl.family === fam.id && !lockOf(fromUrl)) rule = fam.withCode(rule, fromUrl);
   setTitle(make ? t("새 규칙") : preset.name);
@@ -138,6 +141,25 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
   });
   const field = (label, control, hint = null) => h("div", { class: "field" }, h("span", { class: "field-label" }, label), control, hint);
 
+  // 내 규칙에 담기: 이름을 붙여 이 브라우저에. 저장이 막힌 브라우저에서도 단추는 두고 까닭을 띄운다
+  const mineName = h("input", { class: "mine-name", type: "text", maxlength: "40", spellcheck: "false", "aria-label": t("담을 이름"), value: rule.name });
+  const mineMsg = h("p", { class: "field-label mine-msg", role: "status" });
+  const NO_STORE = () => t("이 브라우저에서는 저장이 막혀 있어서 담을 수 없어요. 사생활 보호 창이면 일반 창에서 해 보세요.");
+  const mineField = field(
+    t("내 규칙에 담기"),
+    h(
+      "div",
+      { class: "file-row" },
+      mineName,
+      h("button", { class: "btn small", type: "button", onclick: () => keepMine() }, icon(ICON.save), t("담기")),
+    ),
+    mineMsg,
+  );
+  if (!canStore()) mineMsg.textContent = NO_STORE();
+  mineName.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") keepMine();
+  });
+
   // 무늬: 지금 규칙에 맞는 무늬 모음, RLE 불러오기·붙여 넣기·내려받기(Life 계열과 와이어월드)
   const patList = h("div", { class: "file-row pattern-list", role: "group", "aria-label": t("무늬 고르기"), hidden: true });
   const rleErrs = h("ul", { class: "errs", role: "status" });
@@ -211,6 +233,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
         { class: "more-body" },
         rleField,
         statesField ? field(fam.states.label(), statesField, h("span", { class: "field-label" }, fam.states.note())) : null,
+        mineField,
         field(
           t("규칙 파일"),
           h(
@@ -247,13 +270,13 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
       "div",
       {},
       h("h1", {}, make ? t("새 규칙") : preset.name),
-      h("p", {}, make ? (MAKE_LEAD[fam.id] ?? MAKE_LEAD.life)() : tagOf(preset)),
+      h("p", {}, make ? (MAKE_LEAD[fam.id] ?? MAKE_LEAD.life)() : mine ? t("이 브라우저에 담아 둔 내 규칙이에요. 고쳐서 다시 담을 수 있어요.") : tagOf(preset)),
       famSeg ? famSeg.el : null,
     ),
     notation.el,
   );
 
-  const notes = make ? makeNotes() : presetNotes();
+  const notes = make || mine ? makeNotes() : presetNotes();
 
   function makeNotes() {
     const tips = MAKE_TIPS(fam.id);
@@ -267,7 +290,11 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
               .filter((x) => x.kind === "rule"),
             (x) => x.notation,
           );
+    // 담아 둔 내 규칙(만들기 화면에만, 담은 게 있을 때)
+    const mineList = make ? mineGroup(SCREEN_FAMILIES, { familyName: (id) => FAMILY[id]?.label() ?? id }) : null;
+    if (mineList) thumbs.push(mineList);
     return [
+      mineList ? h("section", { class: "notes mine-notes" }, h("h2", {}, t("내 규칙")), mineList.el) : null,
       tips.length
         ? h(
             "section",
@@ -702,7 +729,7 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
     const q = new URLSearchParams();
     if (code && (make || code !== formatCode(base))) q.set("rule", code);
     else if (make && fam.id !== "life") q.set("family", fam.id);
-    const path = make ? "#/make" : `#/r/${preset.id}`;
+    const path = make ? "#/make" : mine ? `#/mine/${encodeURIComponent(mine)}` : `#/r/${preset.id}`;
     const want = q.toString() ? `${path}?${q}` : path;
     if (location.hash !== want) history.replaceState(null, "", want);
   }
@@ -792,6 +819,15 @@ export function ruleView(main, { preset = null, params = {} } = {}) {
 
   function download() {
     saveFile(formatRuleFile(toRuleFile(rule)), `${rule.id || "rule"}.json`, "application/json");
+  }
+
+  /** 지금 규칙을 이름을 붙여 내 규칙에 담는다 */
+  function keepMine() {
+    const name = mineName.value.trim() || rule.name;
+    const res = addMine(rule, name);
+    if (res.error === "store") mineMsg.textContent = NO_STORE();
+    else if (res.error === "full") mineMsg.textContent = t("내 규칙은 {n}개까지 담을 수 있어요. 도감 끝 '내 규칙'에서 지운 뒤 담아 주세요.", { n: MAX_MINE });
+    else mineMsg.textContent = t("{name:을를} 내 규칙에 담았어요. 도감 끝과 만들기 화면에서 다시 열 수 있어요.", { name: `'${name}'` });
   }
 
   function saveFile(text, name, type) {

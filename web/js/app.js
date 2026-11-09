@@ -2,6 +2,7 @@
 //   #/            첫 화면과 도감
 //   #/r/<id>      도감 규칙 하나 (?rule=B36/S23 로 고친 규칙)
 //   #/make        새 규칙 만들기 (?rule=…)
+//   #/mine/<key>  내 규칙(이 브라우저에 담아 둔 규칙) 하나
 //   #/about       소개
 // 언어: 주소의 ?lang=en(# 앞)이나 머리 줄의 언어 단추. 고른 언어는 이 브라우저에 남긴다(store 'lang')
 
@@ -14,6 +15,8 @@ import { homeView } from "./views/home.js";
 import { ruleView } from "./views/rule.js";
 import { aboutView } from "./views/about.js";
 import { notFound } from "./views/common.js";
+import { mineRule } from "./ui/myrules.js";
+import { SCREEN_FAMILIES } from "./ui/families.js";
 
 const main = document.getElementById("main");
 let presets = [];
@@ -61,6 +64,10 @@ function route({ keep = false } = {}) {
       const id = decodeURIComponent(path.slice(3));
       const preset = local.find((p) => p.id === id);
       current = preset ? ruleView(main, { preset, params }) : notFound(main);
+    } else if (path.startsWith("/mine/")) {
+      const key = decodeURIComponent(path.slice(6));
+      const mine = mineRule(key, SCREEN_FAMILIES);
+      current = mine ? ruleView(main, { preset: localRule(mine), params, mine: key }) : notFound(main);
     } else current = notFound(main);
   } catch (e) {
     console.error(e);

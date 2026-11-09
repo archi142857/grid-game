@@ -18,3 +18,15 @@ export function save(key, value) {
     /* 저장 못 해도 괜찮다 */
   }
 }
+
+/** 이 브라우저에 실제로 저장할 수 있는가(사생활 보호 창 등에서는 막힌다) */
+export function canStore() {
+  try {
+    const k = `${PREFIX}__test`;
+    localStorage.setItem(k, "1");
+    localStorage.removeItem(k);
+    return true;
+  } catch {
+    return false;
+  }
+}

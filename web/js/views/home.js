@@ -15,6 +15,8 @@ import { segmented, zoomControls, flashLine, modKey, makeCapsule, makeFullscreen
 import { newRuleArt } from "../ui/art.js";
 import { makeThumb, hoverPlay } from "../ui/thumb.js";
 import { shortName, creditOf, tagOf, SOON } from "../data/catalog.js";
+import { mineGroup } from "../ui/myrules.js";
+import { FAMILY, SCREEN_FAMILIES } from "../ui/families.js";
 
 const copy = (o) => structuredClone(o);
 // 도감 그림은 늘 같은 씨앗에서 이만큼 넘긴 모습으로 서 있다(개미는 걸음 수. 없으면 계열마다 정한 만큼)
@@ -541,6 +543,12 @@ function makeShelf(presets) {
   // 묶음을 아직 정하지 않은 계열은 머리 없이 뒤에
   const rest = presets.filter((p) => !known.has(p.family));
   if (rest.length) groups.push(group(null, rest.map(item)));
+  // 내 규칙(이 브라우저에 담아 둔 것, 있을 때만)은 도감 묶음 다음에
+  const mine = mineGroup(SCREEN_FAMILIES, { familyName: (id) => FAMILY[id]?.label() ?? id });
+  if (mine) {
+    thumbs.push(mine);
+    groups.push(mine.el);
+  }
   // 새 규칙 만들기는 맨 끝에 머리 없는 묶음으로
   groups.push(
     group(null, [
