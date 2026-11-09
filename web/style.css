@@ -203,6 +203,7 @@ button {
   color: var(--ink-2);
   font-weight: 550;
   line-height: 1.3;
+  white-space: nowrap; /* Field guide 가 두 줄로, Make 가 Mak/e 로 끊기지 않게 */
 }
 .nav a:hover {
   color: var(--ink);
@@ -262,6 +263,18 @@ main {
 }
 .foot a {
   color: var(--ink-2);
+}
+/* 언어 단추(.text-btn)는 바닥 줄에서는 옆 링크와 같은 높이·굵기·밑줄 */
+.foot .lang-btn {
+  padding: 0;
+  font-weight: inherit;
+  color: var(--ink-2);
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+.foot .lang-btn:hover {
+  color: var(--ink);
 }
 
 .loading {
@@ -1298,6 +1311,33 @@ main {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* RLE 붙여 넣기 칸: 소개의 .code-block 과 같은 고정폭 글. 묶음(.rle-paste)은 무늬 칸 너비를 다 쓴다 */
+.rle-paste {
+  justify-self: stretch;
+}
+.rle-in {
+  width: 100%;
+  min-height: 7.4em;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--r-s);
+  background: var(--raise);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font:
+    0.8125rem/1.6 ui-monospace,
+    "SFMono-Regular",
+    Menlo,
+    Consolas,
+    monospace;
+  resize: vertical;
+}
+.rle-in::placeholder {
+  color: var(--ink-3);
+}
+.rle-in:hover {
+  box-shadow: inset 0 0 0 1px var(--ink-4);
+}
 .errs {
   margin: 0;
   padding-left: 1.1em;
@@ -2099,6 +2139,22 @@ html.has-full body {
   }
 }
 
+/* 좁은 폰(360px 안팎): 머리 줄 메뉴 셋이 영어(Field guide·Make·About)여도 한 줄에 서게 사이를 줄인다 */
+@media (max-width: 400px) {
+  .top-in {
+    gap: 8px;
+  }
+  .nav a {
+    padding: 8px;
+  }
+}
+@media (max-width: 340px) {
+  .nav a {
+    padding: 8px 6px;
+    font-size: 0.9375rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -2125,7 +2181,8 @@ html.has-full body {
   .tr,
   .tr-st,
   .paint,
-  .machine td {
+  .machine td,
+  .rle-in {
     border: 1px solid CanvasText;
   }
   .swatch::before {
