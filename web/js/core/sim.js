@@ -244,6 +244,10 @@ function cellSim(rule, kind) {
     get alive() {
       return kind.changedAsAlive ? lastChanged : P.alive;
     },
+    /** 빈칸이 아닌 칸 수(판 전체). 0 이면 빈 판이다(와이어월드는 전자가 없어도 도선이 있으면 0 이 아니다) */
+    get filled() {
+      return P.filled;
+    },
     /** 쓰고 있는 조각 수(넓게 퍼질수록 커진다) */
     get size() {
       return P.size;
@@ -401,6 +405,10 @@ function antSim(rule) {
     head: null,
     /** 빈칸이 아닌 칸 수 */
     get alive() {
+      return P.filled;
+    },
+    /** 빈칸이 아닌 칸 수(alive 와 같다). 개미는 세지 않아서, 개미만 있는 판은 0 이다 */
+    get filled() {
       return P.filled;
     },
     get size() {
@@ -636,6 +644,10 @@ function elementarySim(rule) {
     /** 지금 줄의 켜진 칸 수 */
     get alive() {
       return ones;
+    },
+    /** 남아 있는 줄 전체의 켜진 칸 수. 0 이면 빈 판이다 */
+    get filled() {
+      return P.filled;
     },
     get size() {
       return P.size;

@@ -9,7 +9,7 @@ import { makePlane } from "../web/js/core/plane.js";
 import { makeTable, explain } from "../web/js/core/life.js";
 import { parseRLE } from "../web/js/core/rle.js";
 import { makeRng } from "../web/js/core/rng.js";
-import { checkRuleFile, lifeRule } from "../web/js/core/rules.js";
+import { checkRuleFile, lifeRule, FAMILIES } from "../web/js/core/rules.js";
 
 const DIR = fileURLToPath(new URL("../web/data/rules/", import.meta.url));
 const preset = (id) => checkRuleFile(JSON.parse(readFileSync(DIR + id + ".json", "utf8"))).rule;
@@ -180,4 +180,57 @@ test("뒤집기는 네모 안의 산 칸과 빈칸을 바꾼다", () => {
   sim.invert({ x: 0, y: 0, w: 2, h: 2 });
   assert.equal(dump(sim), "0,1,1 1,0,1 1,1,1");
   assert.throws(() => makeSim({ family: "nope" }), /계열/);
+});
+
+/** 빈칸이 아닌 칸을 하나하나 센다(기준 답) */
+function cellCount(src) {
+  const b = src.bounds();
+  if (!b) return 0;
+  let n = 0;
+  src.blocks(b.x0, b.y0, b.x1, b.y1, (ox, oy, w, h, cells) => {
+    for (let i = 0; i < w * h; i++) if (cells[i]) n++;
+  });
+  return n;
+}
+
+const anyPreset = (id) => checkRuleFile(JSON.parse(readFileSync(DIR + id + ".json", "utf8")), { families: FAMILIES }).rule;
+
+test("filled 는 빈칸이 아닌 칸 수다. 계열마다 하나하나 센 것과 같고, 0 이면 빈 판이다", () => {
+  const runs = { "conway-life": 40, "brians-brain": 20, "hex-life": 30, wireworld: 30, "cyclic-14": 10, "langtons-ant": 600, "fibonacci-turmite": 300, "rule-30": 60, "rule-110": 60 };
+  for (const [id, n] of Object.entries(runs)) {
+    const sim = makeSim(anyPreset(id));
+    sim.seed(region, makeRng(7));
+    assert.equal(sim.filled, cellCount(sim), `${id} 뿌린 뒤`); // 개미는 빈 판에 개미만 놓는다
+    const snap = sim.snapshot();
+    assert.ok(sim.step(n), id);
+    assert.ok(sim.filled > 0, `${id} ${n}번 넘긴 뒤`);
+    assert.equal(sim.filled, cellCount(sim), `${id} ${n}번 넘긴 뒤`);
+    const x = 1000;
+    const y = sim.family === "elementary" ? sim.head : 1000;
+    const before = sim.filled;
+    sim.set(x, y, 1);
+    assert.equal(sim.filled, before + 1, `${id} 칸 하나 칠하기`);
+    sim.set(x, y, 0);
+    assert.equal(sim.filled, before, `${id} 칸 하나 지우기`);
+    sim.restore(snap);
+    assert.equal(sim.filled, cellCount(sim), `${id} 되돌린 뒤`);
+    sim.clear();
+    assert.equal(sim.filled, 0, `${id} 비운 뒤`);
+    assert.equal(sim.bounds(), null, `${id} 비운 뒤`);
+  }
+});
+
+test("와이어월드는 전자가 없어도 도선이 있으면 빈 판이 아니고, 개미만 있는 판은 칸이 없다", () => {
+  const ww = makeSim(anyPreset("wireworld"));
+  for (let x = 0; x < 5; x++) ww.set(x, 0, 3);
+  assert.equal(ww.alive, 0);
+  assert.equal(ww.filled, 5);
+  ww.step(3);
+  assert.equal(ww.filled, 5);
+  const ant = makeSim(anyPreset("langtons-ant"));
+  ant.addAgent(0, 0);
+  assert.equal(ant.filled, 0);
+  assert.ok(ant.bounds());
+  ant.step();
+  assert.equal(ant.filled, 1);
 });
