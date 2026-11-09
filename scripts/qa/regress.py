@@ -188,6 +188,7 @@ with sync_playwright() as p:
             c2.close()
 
     # 3. 폰 첫 화면 끌기 안내: 옆으로 끌면 뜨고, 세로로 쓸 때·전체 화면에서는 안 뜬다
+    #    옆으로 끌기를 맨 먼저 한다(전체 화면을 나온 바로 뒤에는 자리가 덜 잡혀 가끔 안 떴다)
     ctx = new_context(b, "phone390", "light")
     page = ctx.new_page()
     t = Touch(ctx, page)
@@ -196,6 +197,15 @@ with sync_playwright() as p:
     center_into_view(page, ".hero .stage")
     t.tap_el(".hero .capsule .play")
     fl = page.locator(".hero .stage-flash")
+    cv = box(page, ".hero canvas")
+    t.drag(cv["x"] + cv["w"] * 0.2, cv["y"] + cv["h"] / 2, cv["x"] + cv["w"] * 0.8, cv["y"] + cv["h"] / 2 + 4)
+    try:  # 2.4초 떠 있으니 뜰 때까지 조금 기다린다
+        fl.wait_for(state="visible", timeout=2000)
+    except Exception:
+        pass
+    check("phone home: sideways drag shows a hint", fl.is_visible(), fl.text_content() if fl.count() else "")
+    page.screenshot(path=f"{a.out}/phone390_touch_hint.png")
+    page.wait_for_timeout(2800)  # 안내가 사라질 때까지
     cv = box(page, ".hero canvas")
     t.drag(cv["x"] + cv["w"] / 2, cv["y"] + cv["h"] * 0.7, cv["x"] + cv["w"] / 2 + 6, cv["y"] + cv["h"] * 0.2)
     check("phone home: vertical swipe shows no hint", not fl.is_visible(), fl.text_content())
@@ -207,15 +217,6 @@ with sync_playwright() as p:
     check("phone full: one-finger drag shows no hint", not fl.is_visible(), fl.text_content())
     t.tap_el(".hero .zoom button[aria-label='전체 화면 끝내기']")
     page.wait_for_timeout(500)
-    center_into_view(page, ".hero .stage")
-    cv = box(page, ".hero canvas")
-    t.drag(cv["x"] + cv["w"] * 0.2, cv["y"] + cv["h"] / 2, cv["x"] + cv["w"] * 0.8, cv["y"] + cv["h"] / 2 + 4)
-    try:  # 2.4초 떠 있으니 뜰 때까지 조금 기다린다(바쁜 기계에서 늦게 뜰 수 있다)
-        fl.wait_for(state="visible", timeout=2000)
-    except Exception:
-        pass
-    check("phone home: sideways drag shows a hint", fl.is_visible(), fl.text_content() if fl.count() else "")
-    page.screenshot(path=f"{a.out}/phone390_touch_hint.png")
     ctx.close()
     b.close()
 check.done()

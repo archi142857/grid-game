@@ -1,12 +1,13 @@
 """성능 재기: 큰 판에서 한 장 그리는 데 걸리는 시간(WebGL 을 할지 정하는 데 쓴다, 설계 6절).
 
-    python3 scripts/qa/perf.py [주소] [--quick] [--out 폴더]
+    python3 scripts/qa/perf.py [주소] [--quick] [--only 기기] [--ant] [--out 폴더]
 
 규칙 화면(생명 게임)을 전체 화면으로 열고 칸을 가장 작게(1 css px) 줄인 뒤 흩뿌린다. 보이는 칸이 PC 에서 약 120만,
 뿌린 넓이는 그 70% 다. 그다음 칸 1px·2px·10px 에서
 - 멈춘 채 끌기: 한 장마다 그리기만 한다(board.draw 와 기록 글자)
 - 빠르게 돌리기: 한 장 안에서 세대 넘기기 + 그리기
 rAF 콜백 시간을 한 장(같은 시각)마다 더해 잰다. 16ms 를 넘는 장의 몫, 가운데값·90%·가장 큰 값, 초당 장 수, 초당 세대를 적는다.
+--ant 는 개미 빠르게(1초 3000걸음, 전체 화면)를 랭턴의 개미·네모 개미로 잰다.
 기기: PC 1440×900 dpr 1·2, 폰 390×844 dpr 3(그대로, CPU 4배 느리게). 헤드리스 크롬(GPU 없음)이라 진짜 기기와 다를 수 있다.
 """
 
@@ -18,6 +19,7 @@ from common import Checks, args, blur, box, launch, new_context, nums, play_labe
 def _extra(p):
     p.add_argument("--quick", action="store_true", help="PC dpr 1 만")
     p.add_argument("--only", default="", help="이 글자가 든 기기만(예: CPU)")
+    p.add_argument("--ant", action="store_true", help="개미 빠르게(1초 3000걸음)를 잰다")
 
 
 a = args(__doc__, _extra)
@@ -83,7 +85,62 @@ def drag_for(page, secs):
     return page.evaluate("window.__perf.rows")
 
 
+def ant_run(pw):
+    """개미 빠르게: 전체 화면에서 1초 3000걸음으로 1초 데운 뒤 4초 잰다(랭턴의 개미, 네모 개미)"""
+    out = []
+    b = launch(pw)
+    for name, vp, dpr, slow in [c for c in (CONFIGS[:1] if a.quick else CONFIGS) if a.only in c[0]]:
+        opts = dict(VIEWPORTS[vp])
+        opts["device_scale_factor"] = dpr
+        ctx = b.new_context(color_scheme="light", reduced_motion="no-preference", locale="ko-KR", **opts)
+        ctx.add_init_script(PERF_JS)
+        page = ctx.new_page()
+        cdp = ctx.new_cdp_session(page)
+        for rid in ("langtons-ant", "ant-lrrrrrllr"):
+            page.goto(a.url + f"#/r/{rid}", wait_until="networkidle")
+            settle(page, 500)
+            blur(page)
+            if play_label(page) == "일시정지":
+                page.keyboard.press("Space")
+            page.keyboard.press("f")
+            page.wait_for_timeout(500)
+            page.locator(".transport [role=radio][data-id='fast']").click()
+            blur(page)
+            if slow > 1:
+                cdp.send("Emulation.setCPUThrottlingRate", {"rate": slow})
+            page.keyboard.press("Space")
+            page.wait_for_timeout(1000)
+            g0 = nums(page, RULE_NUMS)[0]
+            rows = measure(page, 4.0)
+            g1 = nums(page, RULE_NUMS)[0]
+            page.keyboard.press("Space")
+            if slow > 1:
+                cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
+            run = stats(rows, 4.0)
+            run["steps_per_s"] = round((g1 - g0) / 4.0)
+            row = {"config": name, "rule": rid, "steps": g1, "painted": nums(page, RULE_NUMS)[1], "run": run}
+            out.append(row)
+            print(json.dumps(row, ensure_ascii=False), flush=True)
+            page.keyboard.press("Escape")
+        ctx.close()
+    b.close()
+    print("\n| 기기 | 규칙 | 걸음·칠한 칸 | 돌기: 가운데·90%·최대 ms (16ms 넘는 몫), 장/초, 걸음/초 |")
+    print("|---|---|---|---|")
+    for r in out:
+        u = r["run"]
+        print(f"| {r['config']} | {r['rule']} | {r['steps']:,}·{r['painted']:,} | {u.get('median')}·{u.get('p90')}·{u.get('max')} ({u.get('over16')}), {u.get('fps')}, {u.get('steps_per_s'):,} |")
+    return out
+
+
 results = []
+if a.ant:
+    with sync_playwright() as pw:
+        results = ant_run(pw)
+    with open(f"{a.out}/perf_ant_results.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=1)
+    check("measured", bool(results), len(results))
+    check.done()
+
 with sync_playwright() as pw:
     b = launch(pw)
     for name, vp, dpr, slow in [c for c in (CONFIGS[:1] if a.quick else CONFIGS) if a.only in c[0]]:

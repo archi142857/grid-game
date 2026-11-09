@@ -22,11 +22,12 @@ python3 scripts/qa/pc.py      http://localhost:8000/ --vp pc1024   # 마우스·
 python3 scripts/qa/phone.py   http://localhost:8000/ [--nofs]      # 손가락. --nofs 는 아이폰처럼 전체 화면 API 없이
 python3 scripts/qa/regress.py http://localhost:8000/   # 쪽지로 보낸 버그 다시 보기. 고쳐지면 PASS
 python3 scripts/qa/life.py    http://localhost:8000/   # Life 가 그대로인지(엔진을 바꾸기 전후에)
+python3 scripts/qa/ant.py     http://localhost:8000/   # 개미·터마이트: 칠한 칸 수를 기준 구현과 견주고 개미 화면을 해 본다
 ```
 
 ```
 python3 scripts/qa/pixels.py  앞_주소 뒤_주소          # 두 판의 격자 그림을 같은 장면에서 픽셀로 견주기(board 를 바꿀 때)
-python3 scripts/qa/perf.py    [주소] [--quick] [--only CPU]   # 큰 판에서 한 장 그리는 시간(WebGL 판단)
+python3 scripts/qa/perf.py    [주소] [--quick] [--only CPU] [--ant]   # 큰 판에서 한 장 그리는 시간(WebGL 판단), --ant 는 개미 빠르게
 ```
 
 앞 판은 `git worktree add /tmp/old <커밋>` 으로 꺼내 다른 포트에 띄우면 된다.
@@ -38,10 +39,11 @@ python3 scripts/qa/perf.py    [주소] [--quick] [--only CPU]   # 큰 판에서 
 | 파일 | 하는 일 |
 |---|---|
 | `common.py` | 브라우저·화면 크기(PC 1440×900·1024×700, 폰 390×844), 콘솔 기록, 판 읽기, 터치 흉내, 겉모습 검사 |
-| `survey.py` | 화면 7개 × 크기 3 × 밝은·어두운 캡처와 겉모습 검사 |
+| `survey.py` | 화면 10개(Life·개미·터마이트 규칙 화면, 만들기 Life·개미 포함) × 크기 3 × 밝은·어두운 캡처와 겉모습 검사, 동작 줄이기 |
 | `pc.py` | 첫 화면·규칙 화면·만들기를 마우스와 키보드로 |
 | `phone.py` | 첫 화면·규칙 화면을 손가락으로(쓸기, 핀치, 그리기, 전체 화면) |
 | `regress.py` | 검수가 보낸 버그 쪽지를 다시 확인, 고친 뒤 생길 수 있는 것, 화면마다 글씨 대비 |
 | `life.py`, `life_baseline.json` | 알려진 답(R-펜토미노 1103세대 116칸, 글라이더 총)과 무늬 카드마다의 산 칸 수 기준값 |
+| `ant.py` | 개미·터마이트: → 로 넘긴 칠한 칸 수와 빠르게 돌린 뒤의 칸 수를 파이썬 기준 구현과 견줌, 개미 손·회전 글자·표기·계열 고르기·터마이트 표·키·빠르기·첫 화면 도감 묶음·폰 손가락 |
 | `pixels.py` | 두 판의 격자 그림 견주기: 점·네모·픽셀·모두 보이게, 세대가 넘어가는 중간 그림(시계를 멈춰서)까지 |
 | `perf.py` | 전체 화면·칸 1/2/10px·약 100만 칸에서 끌기(그리기만)와 빠르게 돌기의 한 장 시간. PC dpr 1·2, 폰 dpr 3(CPU 4배 느리게도) |

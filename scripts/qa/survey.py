@@ -2,7 +2,7 @@
 
     python3 scripts/qa/survey.py [주소] [--out 폴더]
 
-화면을 위에서 아래로 굴리며 캡처하고(<크기>_<밝기>_<화면>_<n>.png), 콘솔 오류·가로 넘침·
+화면(첫 화면, 규칙 화면 Life·개미·터마이트, 만들기 Life·개미, 소개, 없는 화면)을 위에서 아래로 굴리며 캡처하고(<크기>_<밝기>_<화면>_<n>.png), 콘솔 오류·가로 넘침·
 화면 밖으로 삐져나온 것·잘린 글·격자 위 조각끼리 겹침을 찾는다. 동작 줄이기에서는 스스로 돌지 않는지 본다.
 """
 
@@ -14,6 +14,9 @@ PAGES = {
     "brian": "#/r/brians-brain",
     "starwars": "#/r/star-wars",
     "make": "#/make",
+    "ant": "#/r/langtons-ant",
+    "turmite": "#/r/fibonacci-turmite",
+    "makeant": "#/make?family=ant",
     "about": "#/about",
     "nf": "#/r/nope",
 }
@@ -50,7 +53,7 @@ with sync_playwright() as p:
     # 동작 줄이기: 첫 화면과 규칙 화면이 스스로 돌지 않아야 한다
     for vp in ("pc1440", "phone390"):
         ctx = new_context(b, vp, "light", "reduce")
-        for name, js in (("home", HOME_NUMS), ("conway", RULE_NUMS)):
+        for name, js in (("home", HOME_NUMS), ("conway", RULE_NUMS), ("ant", RULE_NUMS)):
             page = ctx.new_page()
             page.goto(a.url + PAGES[name], wait_until="networkidle")
             settle(page, 300)
